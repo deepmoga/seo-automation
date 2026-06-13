@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "crawl-only": "node index.js --crawl-only"
+    "crawl-only": "node index.js --crawl-only",
+    "setup": "node setup.js"
   },
   "keywords": ["seo", "wordpress", "automation", "openai"],
   "author": "",
