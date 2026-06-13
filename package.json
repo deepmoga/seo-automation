@@ -5,7 +5,8 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node index.js",
+    "start": "node server.js",
+    "cli": "node index.js",
     "crawl-only": "node index.js --crawl-only",
     "setup": "node setup.js"
   },
@@ -16,6 +17,7 @@
     "axios": "^1.7.7",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
+    "express": "^4.21.1",
     "openai": "^4.67.3"
   }
 }

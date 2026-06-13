@@ -35,5 +35,10 @@ module.exports = {
   // Credentials / secrets loaded from .env
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   WP_USERNAME: process.env.WP_USERNAME,
-  WP_APP_PASSWORD: process.env.WP_APP_PASSWORD
+  WP_APP_PASSWORD: process.env.WP_APP_PASSWORD,
+
+  // Web dashboard settings
+  PORT: process.env.PORT || 4600,
+  ADMIN_USER: process.env.ADMIN_USER || "admin",
+  ADMIN_PASS: process.env.ADMIN_PASS || "admin"
 };

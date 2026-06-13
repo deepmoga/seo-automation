@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEO Automation Dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>🤖 SEO Automation Dashboard</h1>
+        <div class="site-url" id="siteUrl">Loading...</div>
+      </div>
+      <a class="settings-link" href="/settings">⚙️ Settings</a>
+    </div>
+
+    <div class="actions">
+      <button id="btnAudit">🔎 Run Audit (Crawl + Analyze)</button>
+      <button id="btnAuditFix">🔧 Run Audit + AI Auto-Fix</button>
+    </div>
+
+    <div class="status-bar">
+      Status: <span class="badge idle" id="statusBadge">idle</span>
+      <span id="statusMeta"></span>
+    </div>
+
+    <div class="logs" id="logs">No logs yet. Run an audit to get started.</div>
+
+    <div class="summary" id="summary"></div>
+
+    <table id="reportTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>Page URL</th>
+          <th>SEO Score</th>
+          <th>Issues</th>
+        </tr>
+      </thead>
+      <tbody id="reportBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const btnAudit = document.getElementById('btnAudit');
+    const btnAuditFix = document.getElementById('btnAuditFix');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusMeta = document.getElementById('statusMeta');
+    const logsEl = document.getElementById('logs');
+    const summaryEl = document.getElementById('summary');
+    const reportTable = document.getElementById('reportTable');
+    const reportBody = document.getElementById('reportBody');
+
+    let polling = null;
+
+    async function loadConfig() {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      document.getElementById('siteUrl').textContent =
+        `Target: ${data.siteUrl} (max ${data.maxPages} pages)`;
+    }
+
+    function scoreClass(score) {
+      if (score >= 80) return 'good';
+      if (score >= 50) return 'mid';
+      return 'bad';
+    }
+
+    function renderReport(report) {
+      if (!report.exists) {
+        summaryEl.innerHTML = '';
+        reportTable.style.display = 'none';
+        return;
+      }
+
+      const pages = report.pages || [];
+      const avgScore = pages.length
+        ? Math.round(pages.reduce((s, p) => s + p.seoScore, 0) / pages.length)
+        : 0;
+
+      let critical = 0, warning = 0, info = 0;
+      for (const p of pages) {
+        for (const issue of p.issues || []) {
+          if (issue.severity === 'critical') critical++;
+          else if (issue.severity === 'warning') warning++;
+          else info++;
+        }
+      }
+
+      summaryEl.innerHTML = `
+        <div class="stat"><strong>${pages.length}</strong>Pages crawled</div>
+        <div class="stat"><strong>${avgScore}</strong>Avg SEO score</div>
+        <div class="stat"><strong>${critical}</strong>🔴 Critical</div>
+        <div class="stat"><strong>${warning}</strong>🟡 Warning</div>
+        <div class="stat"><strong>${info}</strong>🔵 Info</div>
+      `;
+
+      reportBody.innerHTML = pages.map((p) => `
+        <tr>
+          <td><a href="${p.url}" target="_blank" style="color:#94a3b8;text-decoration:none;">${p.url}</a></td>
+          <td class="score ${scoreClass(p.seoScore)}">${p.seoScore}/100</td>
+          <td>${(p.issues || []).length}</td>
+        </tr>
+      `).join('');
+
+      reportTable.style.display = pages.length ? 'table' : 'none';
+    }
+
+    async function loadReport() {
+      const res = await fetch('/api/report');
+      const data = await res.json();
+      renderReport(data);
+    }
+
+    async function poll() {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+
+      statusBadge.textContent = data.status;
+      statusBadge.className = 'badge ' + data.status;
+
+      statusMeta.textContent = data.mode
+        ? ` | mode: ${data.mode}${data.error ? ' | error: ' + data.error : ''}`
+        : '';
+
+      logsEl.textContent = data.logs && data.logs.length
+        ? data.logs.join('\n')
+        : 'No logs yet. Run an audit to get started.';
+      logsEl.scrollTop = logsEl.scrollHeight;
+
+      const running = data.status === 'running';
+      btnAudit.disabled = running;
+      btnAuditFix.disabled = running;
+
+      if (data.status === 'done' || data.status === 'error') {
+        if (polling) {
+          clearInterval(polling);
+          polling = null;
+        }
+        loadReport();
+      }
+    }
+
+    async function startJob(mode) {
+      const res = await fetch('/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+
+      if (res.status === 409) {
+        alert('A job is already running.');
+        return;
+      }
+
+      if (!polling) {
+        polling = setInterval(poll, 1500);
+      }
+      poll();
+    }
+
+    btnAudit.addEventListener('click', () => startJob('audit'));
+    btnAuditFix.addEventListener('click', () => {
+      if (confirm('This will use AI to generate fixes and apply them to your live WordPress site. Continue?')) {
+        startJob('audit-fix');
+      }
+    });
+
+    loadConfig();
+    loadReport();
+    poll();
+  </script>
+</body>
+</html>
