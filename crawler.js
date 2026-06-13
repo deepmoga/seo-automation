@@ -108,6 +108,9 @@ function extractPageData(html, pageUrl) {
   // Meta description
   const metaDescription = $('meta[name="description"]').attr("content") || "";
 
+  // Meta keywords
+  const metaKeywords = $('meta[name="keywords"]').attr("content") || "";
+
   // Headings
   const h1s = $("h1").map((i, el) => $(el).text().trim()).get();
   const h2s = $("h2").map((i, el) => $(el).text().trim()).get();
@@ -130,8 +133,11 @@ function extractPageData(html, pageUrl) {
   const hasMicrodata = $("[itemtype]").length > 0;
   const hasSchema = hasJsonLd || hasMicrodata;
 
-  // Word count from visible body text
-  const bodyText = $("body").text().replace(/\s+/g, " ").trim();
+  // Word count from visible body text (strip script/style/noscript/svg
+  // content first - otherwise Elementor/JS config JSON pollutes the text)
+  const $body = $("body").clone();
+  $body.find("script, style, noscript, svg, template").remove();
+  const bodyText = $body.text().replace(/\s+/g, " ").trim();
   const wordCount = bodyText ? bodyText.split(" ").length : 0;
 
   // Internal links (count + collect for crawling)
@@ -157,6 +163,8 @@ function extractPageData(html, pageUrl) {
     url: pageUrl,
     title,
     metaDescription,
+    metaKeywords,
+    bodyText,
     h1: h1s,
     h2: h2s,
     h3: h3s,
@@ -170,12 +178,13 @@ function extractPageData(html, pageUrl) {
 }
 
 /**
- * Crawl the site starting from SITE_URL, following internal links only,
- * up to MAX_PAGES. Returns an array of page data objects.
+ * Crawl a site starting from its homepage, following internal links only,
+ * up to maxPages. Returns an array of page data objects.
+ *
+ * @param {string} [siteUrl] - site to crawl (defaults to config.SITE_URL)
+ * @param {number} [maxPages] - max pages to crawl (defaults to config.MAX_PAGES)
  */
-async function crawlSite() {
-  const siteUrl = config.SITE_URL;
-  const maxPages = config.MAX_PAGES;
+async function crawlSite(siteUrl = config.SITE_URL, maxPages = config.MAX_PAGES) {
 
   console.log(`🔎 Starting crawl: ${siteUrl}`);
   console.log(`📄 Max pages to crawl: ${maxPages}`);

@@ -7,28 +7,31 @@ const axios = require("axios");
 const config = require("./config");
 
 /**
- * Build the Basic Auth header from WP_USERNAME + WP_APP_PASSWORD.
+ * Build the Basic Auth header from the given WP credentials, falling
+ * back to global config (single-site/.env mode) if not provided.
  */
-function getAuthHeader() {
-  const { WP_USERNAME, WP_APP_PASSWORD } = config;
+function getAuthHeader(creds = {}) {
+  const wpUsername = creds.wpUsername || config.WP_USERNAME;
+  const wpAppPassword = creds.wpAppPassword || config.WP_APP_PASSWORD;
 
-  if (!WP_USERNAME || !WP_APP_PASSWORD) {
-    throw new Error("WP_USERNAME or WP_APP_PASSWORD is not set in .env");
+  if (!wpUsername || !wpAppPassword) {
+    throw new Error("WordPress username/application password is not configured for this site");
   }
 
-  const token = Buffer.from(`${WP_USERNAME}:${WP_APP_PASSWORD}`).toString("base64");
+  const token = Buffer.from(`${wpUsername}:${wpAppPassword}`).toString("base64");
   return `Basic ${token}`;
 }
 
 /**
  * Return an axios instance pre-configured with the WP REST API base URL
- * and auth header.
+ * and auth header. Accepts optional { wpApiUrl, wpUsername, wpAppPassword }
+ * to target a specific site; falls back to global config otherwise.
  */
-function getApiClient() {
+function getApiClient(creds = {}) {
   return axios.create({
-    baseURL: config.WP_API_URL,
+    baseURL: creds.wpApiUrl || config.WP_API_URL,
     headers: {
-      Authorization: getAuthHeader(),
+      Authorization: getAuthHeader(creds),
       "Content-Type": "application/json"
     },
     timeout: 20000
@@ -40,9 +43,9 @@ function getApiClient() {
  * Searches both /posts and /pages endpoints by slug.
  * Returns { id, type } or null if not found.
  */
-async function findPostByUrl(pageUrl) {
+async function findPostByUrl(pageUrl, creds = {}) {
   try {
-    const api = getApiClient();
+    const api = getApiClient(creds);
     const url = new URL(pageUrl);
 
     // Slug is the last non-empty path segment (or empty for homepage)
@@ -79,9 +82,9 @@ async function findPostByUrl(pageUrl) {
  * Find a media library item by its source URL (used to update alt text).
  * Returns the media ID or null if not found.
  */
-async function findMediaByUrl(imageUrl) {
+async function findMediaByUrl(imageUrl, creds = {}) {
   try {
-    const api = getApiClient();
+    const api = getApiClient(creds);
     const filename = imageUrl.split("/").pop().split("?")[0];
 
     const { data } = await api.get("/media", {
@@ -108,11 +111,11 @@ async function findMediaByUrl(imageUrl) {
  * @param {object} fixes - { title, metaDescription, schema, postType }
  *   postType defaults to "posts" if not provided.
  */
-async function updatePostSEO(postId, fixes = {}) {
+async function updatePostSEO(postId, fixes = {}, creds = {}) {
   const { title, metaDescription, schema, postType = "posts" } = fixes;
 
   try {
-    const api = getApiClient();
+    const api = getApiClient(creds);
     const payload = {};
 
     // Try Yoast SEO fields first (used by Yoast SEO plugin's REST support)
@@ -138,7 +141,7 @@ async function updatePostSEO(postId, fixes = {}) {
 
     // Inject schema markup if provided
     if (schema) {
-      await injectSchema(postId, schema, postType);
+      await injectSchema(postId, schema, postType, creds);
     }
 
     return true;
@@ -154,11 +157,11 @@ async function updatePostSEO(postId, fixes = {}) {
  * @param {number} mediaId - WordPress media item ID
  * @param {string} altText - new alt text
  */
-async function updateImageAlt(mediaId, altText) {
+async function updateImageAlt(mediaId, altText, creds = {}) {
   if (!mediaId || !altText) return false;
 
   try {
-    const api = getApiClient();
+    const api = getApiClient(creds);
     await api.post(`/media/${mediaId}`, { alt_text: altText });
 
     console.log(`   🖼️  Updated alt text for media #${mediaId}: "${altText}"`);
@@ -178,11 +181,11 @@ async function updateImageAlt(mediaId, altText) {
  * @param {string|object} schemaJson - schema object or JSON string
  * @param {string} postType - "posts" or "pages"
  */
-async function injectSchema(postId, schemaJson, postType = "posts") {
+async function injectSchema(postId, schemaJson, postType = "posts", creds = {}) {
   if (!schemaJson) return false;
 
   try {
-    const api = getApiClient();
+    const api = getApiClient(creds);
 
     // Normalize schema to a JSON string
     const schemaString =

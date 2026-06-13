@@ -5,14 +5,15 @@
 require("dotenv").config();
 
 module.exports = {
-  // The website to crawl and audit
+  // Default site (used by the CLI when no site is specified, and as
+  // fallback values for the first site created via the dashboard)
   SITE_URL: "https://officialsolutions.in",
 
   // WordPress REST API base URL
   WP_API_URL: "https://officialsolutions.in/wp-json/wp/v2",
 
-  // Maximum number of pages to crawl (safety limit)
-  MAX_PAGES: 50,
+  // Maximum number of pages to crawl (safety limit, can be overridden per-site)
+  MAX_PAGES: 200,
 
   // Default content language (used in AI prompts)
   LANGUAGE: "en",

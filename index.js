@@ -12,6 +12,26 @@
 const readline = require("readline");
 
 const runner = require("./runner");
+const sitesStore = require("./sites-store");
+
+/**
+ * Resolve which site to audit from CLI args (--site=<id|name>), falling
+ * back to the first configured site, or null (legacy config.js defaults).
+ */
+function resolveSite(args) {
+  const sites = sitesStore.getSites();
+  if (sites.length === 0) return null;
+
+  const siteArg = args.find((a) => a.startsWith("--site="));
+  if (siteArg) {
+    const value = siteArg.split("=")[1];
+    const match = sites.find((s) => s.id === value || s.name === value);
+    if (match) return match;
+    console.log(`⚠️  No site found matching "${value}", using the first configured site.`);
+  }
+
+  return sites[0];
+}
 
 /**
  * Ask the user a yes/no question on the CLI. Returns true for "yes".
@@ -37,11 +57,16 @@ function askConfirmation(question) {
 async function main() {
   const args = process.argv.slice(2);
   const crawlOnly = args.includes("--crawl-only");
+  const site = resolveSite(args);
+
+  if (site) {
+    console.log(`📌 Using site: ${site.name} (${site.siteUrl})`);
+  }
 
   // 1-3. Crawl, analyze, print + save report
   let analyzedPages = [];
   try {
-    analyzedPages = await runner.runAudit();
+    analyzedPages = await runner.runAudit(site);
   } catch (err) {
     console.log(`❌ ${err.message}`);
     return;
@@ -70,7 +95,7 @@ async function main() {
   }
 
   // 5-6. Apply AI-generated fixes via WordPress REST API + save final report
-  await runner.runAutoFix(analyzedPages);
+  await runner.runAutoFix(analyzedPages, site);
 }
 
 // Run and never let an unhandled error crash the process silently

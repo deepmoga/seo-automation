@@ -107,12 +107,27 @@ function printSummaryTable(pages) {
 }
 
 /**
- * Save the full report (pages with issues, scores, fixes applied)
- * to report.json in the project root.
+ * Resolve the report file path. When siteId is given, reports are stored
+ * per-site under reports/<siteId>.json; otherwise the legacy single
+ * report.json in the project root is used (CLI default-site mode).
  */
-function saveReport(pages, extra = {}) {
+function getReportPath(siteId = null) {
+  if (siteId) {
+    const dir = path.join(__dirname, "reports");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, `${siteId}.json`);
+  }
+
+  return path.join(__dirname, "report.json");
+}
+
+/**
+ * Save the full report (pages with issues, scores, fixes applied,
+ * keyword analysis, suggestions) to disk.
+ */
+function saveReport(pages, extra = {}, siteId = null) {
   try {
-    const reportPath = path.join(__dirname, "report.json");
+    const reportPath = getReportPath(siteId);
 
     const report = {
       generatedAt: new Date().toISOString(),
@@ -124,12 +139,28 @@ function saveReport(pages, extra = {}) {
     fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), "utf-8");
     console.log(`💾 Report saved to ${reportPath}`);
   } catch (err) {
-    console.log(`⚠️  Failed to save report.json: ${err.message}`);
+    console.log(`⚠️  Failed to save report: ${err.message}`);
+  }
+}
+
+/**
+ * Load a previously saved report. Returns null if it doesn't exist.
+ */
+function loadReport(siteId = null) {
+  try {
+    const reportPath = getReportPath(siteId);
+    if (!fs.existsSync(reportPath)) return null;
+    return JSON.parse(fs.readFileSync(reportPath, "utf-8"));
+  } catch (err) {
+    console.log(`⚠️  Failed to load report: ${err.message}`);
+    return null;
   }
 }
 
 module.exports = {
   printReport,
   printSummaryTable,
-  saveReport
+  saveReport,
+  loadReport,
+  getReportPath
 };

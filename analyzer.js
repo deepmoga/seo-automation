@@ -61,6 +61,24 @@ function checkPage(page) {
     });
   }
 
+  // --- Meta keywords checks ---
+  if (!page.metaKeywords) {
+    issues.push({
+      type: "missing_meta_keywords",
+      message: "Missing meta keywords tag",
+      severity: "info"
+    });
+  } else {
+    const keywordCount = page.metaKeywords.split(",").map((k) => k.trim()).filter(Boolean).length;
+    if (keywordCount > 10) {
+      issues.push({
+        type: "meta_keywords_stuffed",
+        message: `Meta keywords tag has too many keywords (${keywordCount}, recommended up to 10) - looks like keyword stuffing`,
+        severity: "info"
+      });
+    }
+  }
+
   // --- H1 checks ---
   if (!page.h1 || page.h1.length === 0) {
     issues.push({

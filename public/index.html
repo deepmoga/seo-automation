@@ -13,12 +13,25 @@
         <h1>🤖 SEO Automation Dashboard</h1>
         <div class="site-url" id="siteUrl">Loading...</div>
       </div>
-      <a class="settings-link" href="/settings">⚙️ Settings</a>
+      <a class="settings-link" href="/logout">🚪 Logout</a>
+    </div>
+
+    <div class="nav-links">
+      <a href="/" class="active">Dashboard</a>
+      <a href="/sites">Sites</a>
+      <a href="/settings">Settings</a>
+    </div>
+
+    <div class="field" style="max-width:400px;">
+      <label for="siteSelect">Site</label>
+      <select id="siteSelect"></select>
     </div>
 
     <div class="actions">
       <button id="btnAudit">🔎 Run Audit (Crawl + Analyze)</button>
       <button id="btnAuditFix">🔧 Run Audit + AI Auto-Fix</button>
+      <button id="btnSuggestions">💡 Generate SEO Suggestions</button>
+      <button id="btnMetaSuggestions">📝 Generate Meta Suggestions</button>
     </div>
 
     <div class="status-bar">
@@ -40,22 +53,89 @@
       </thead>
       <tbody id="reportBody"></tbody>
     </table>
+
+    <div class="section" id="suggestionsSection" style="display:none;">
+      <h2>💡 SEO Improvement Suggestions</h2>
+      <div id="suggestionsList"></div>
+    </div>
+
+    <div class="section" id="keywordsSection" style="display:none;">
+      <h2>🔑 Keyword Analysis</h2>
+      <div class="kw-grid">
+        <div>
+          <h3>Main Keywords</h3>
+          <ul class="kw-list" id="topKeywordsList"></ul>
+        </div>
+        <div>
+          <h3>Long-Tail Keyword Opportunities</h3>
+          <ul class="kw-list" id="longTailList"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="metaSuggestionsSection" style="display:none;">
+      <h2>📝 Per-Page Meta Suggestions</h2>
+      <div id="metaSuggestionsList"></div>
+    </div>
   </div>
 
   <script>
+    const siteSelect = document.getElementById('siteSelect');
     const btnAudit = document.getElementById('btnAudit');
     const btnAuditFix = document.getElementById('btnAuditFix');
+    const btnSuggestions = document.getElementById('btnSuggestions');
+    const btnMetaSuggestions = document.getElementById('btnMetaSuggestions');
     const statusBadge = document.getElementById('statusBadge');
     const statusMeta = document.getElementById('statusMeta');
     const logsEl = document.getElementById('logs');
     const summaryEl = document.getElementById('summary');
     const reportTable = document.getElementById('reportTable');
     const reportBody = document.getElementById('reportBody');
+    const suggestionsSection = document.getElementById('suggestionsSection');
+    const suggestionsList = document.getElementById('suggestionsList');
+    const keywordsSection = document.getElementById('keywordsSection');
+    const topKeywordsList = document.getElementById('topKeywordsList');
+    const longTailList = document.getElementById('longTailList');
+    const metaSuggestionsSection = document.getElementById('metaSuggestionsSection');
+    const metaSuggestionsList = document.getElementById('metaSuggestionsList');
 
     let polling = null;
 
+    function currentSiteId() {
+      return siteSelect.value;
+    }
+
+    async function loadSites() {
+      const res = await fetch('/api/sites');
+      const data = await res.json();
+      const sites = data.sites || [];
+
+      if (sites.length === 0) {
+        document.getElementById('siteUrl').textContent = 'No sites configured - add one on the Sites page.';
+        return;
+      }
+
+      const saved = localStorage.getItem('selectedSiteId');
+      siteSelect.innerHTML = sites.map((s) =>
+        `<option value="${s.id}">${s.name} (${s.siteUrl})</option>`
+      ).join('');
+
+      if (saved && sites.some((s) => s.id === saved)) {
+        siteSelect.value = saved;
+      }
+
+      await loadConfig();
+      await loadReport();
+    }
+
+    siteSelect.addEventListener('change', async () => {
+      localStorage.setItem('selectedSiteId', currentSiteId());
+      await loadConfig();
+      await loadReport();
+    });
+
     async function loadConfig() {
-      const res = await fetch('/api/config');
+      const res = await fetch(`/api/config?siteId=${currentSiteId()}`);
       const data = await res.json();
       document.getElementById('siteUrl').textContent =
         `Target: ${data.siteUrl} (max ${data.maxPages} pages)`;
@@ -67,10 +147,69 @@
       return 'bad';
     }
 
+    function renderSuggestions(suggestions) {
+      if (!suggestions || suggestions.length === 0) {
+        suggestionsSection.style.display = 'none';
+        return;
+      }
+
+      suggestionsSection.style.display = 'block';
+      suggestionsList.innerHTML = suggestions.map((s) => `
+        <div class="suggestion">
+          <div class="s-title"><span class="prio ${s.priority || 'medium'}">${s.priority || 'medium'}</span>${s.title || ''}</div>
+          <div class="s-detail">${s.detail || ''}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderKeywords(keywords) {
+      if (!keywords || (!keywords.topKeywords?.length && !keywords.longTailKeywords?.length)) {
+        keywordsSection.style.display = 'none';
+        return;
+      }
+
+      keywordsSection.style.display = 'block';
+
+      topKeywordsList.innerHTML = (keywords.topKeywords || []).map((k) => `
+        <li><span>${k.keyword}</span><span class="count">${k.frequency} (${k.pageCount} pages)</span></li>
+      `).join('') || '<li>None detected</li>';
+
+      longTailList.innerHTML = (keywords.longTailKeywords || []).map((k) => `
+        <li><span>${k.phrase}</span><span class="count">${k.frequency} (${k.pageCount} pages)</span></li>
+      `).join('') || '<li>None detected</li>';
+    }
+
+    function renderMetaSuggestions(metaSuggestions) {
+      if (!metaSuggestions || Object.keys(metaSuggestions).length === 0) {
+        metaSuggestionsSection.style.display = 'none';
+        return;
+      }
+
+      metaSuggestionsSection.style.display = 'block';
+
+      metaSuggestionsList.innerHTML = Object.entries(metaSuggestions).map(([url, s]) => `
+        <details class="page-detail">
+          <summary>${url}</summary>
+          <div class="meta-suggestion">
+            <div class="label">Suggested Title</div>
+            <div class="new">${s.title || ''}</div>
+            <div class="label">Suggested Meta Description</div>
+            <div class="new">${s.metaDescription || ''}</div>
+            <div class="label">Suggested Meta Keywords</div>
+            <div class="new">${s.metaKeywords || ''}</div>
+            ${s.reason ? `<div class="reason">${s.reason}</div>` : ''}
+          </div>
+        </details>
+      `).join('');
+    }
+
     function renderReport(report) {
       if (!report.exists) {
         summaryEl.innerHTML = '';
         reportTable.style.display = 'none';
+        renderSuggestions(null);
+        renderKeywords(null);
+        renderMetaSuggestions(null);
         return;
       }
 
@@ -105,10 +244,14 @@
       `).join('');
 
       reportTable.style.display = pages.length ? 'table' : 'none';
+
+      renderSuggestions(report.suggestions);
+      renderKeywords(report.keywords);
+      renderMetaSuggestions(report.metaSuggestions);
     }
 
     async function loadReport() {
-      const res = await fetch('/api/report');
+      const res = await fetch(`/api/report?siteId=${currentSiteId()}`);
       const data = await res.json();
       renderReport(data);
     }
@@ -132,6 +275,8 @@
       const running = data.status === 'running';
       btnAudit.disabled = running;
       btnAuditFix.disabled = running;
+      btnSuggestions.disabled = running;
+      btnMetaSuggestions.disabled = running;
 
       if (data.status === 'done' || data.status === 'error') {
         if (polling) {
@@ -146,11 +291,17 @@
       const res = await fetch('/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode })
+        body: JSON.stringify({ mode, siteId: currentSiteId() })
       });
 
       if (res.status === 409) {
         alert('A job is already running.');
+        return;
+      }
+
+      if (res.status >= 400) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to start job.');
         return;
       }
 
@@ -166,9 +317,14 @@
         startJob('audit-fix');
       }
     });
+    btnSuggestions.addEventListener('click', () => startJob('suggestions'));
+    btnMetaSuggestions.addEventListener('click', () => {
+      if (confirm('This will use AI to generate per-page title/meta suggestions for all pages with issues. Continue?')) {
+        startJob('meta-suggestions');
+      }
+    });
 
-    loadConfig();
-    loadReport();
+    loadSites();
     poll();
   </script>
 </body>

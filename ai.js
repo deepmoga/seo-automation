@@ -220,9 +220,157 @@ async function generateSchema(pageData) {
   }
 }
 
+/**
+ * Generate a non-destructive suggestion for a page's title, meta
+ * description and meta keywords - used to show "here's what we'd
+ * suggest" without applying anything. Returns
+ * { title, metaDescription, metaKeywords, reason } or null on failure.
+ */
+async function suggestMetaForPage(pageData) {
+  try {
+    const openai = getClient();
+    const context = buildPageContext(pageData);
+
+    const response = await openai.chat.completions.create({
+      model: config.OPENAI_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an expert SEO consultant. Reply with ONLY a valid JSON object " +
+            '(no markdown fences) in this exact shape: ' +
+            '{"title": "...", "metaDescription": "...", "metaKeywords": "...", "reason": "..."}. ' +
+            "title must be 50-60 characters, metaDescription 140-155 characters, " +
+            "metaKeywords a comma-separated list of up to 8 relevant keywords/phrases, " +
+            "and reason a short (1-2 sentence) explanation of what changed and why."
+        },
+        {
+          role: "user",
+          content:
+            `Current title: ${pageData.title || "(none)"}\n` +
+            `Current meta description: ${pageData.metaDescription || "(none)"}\n` +
+            `Current meta keywords: ${pageData.metaKeywords || "(none)"}\n\n` +
+            `Page details:\n${context}\n\n` +
+            `Suggest improved values for title, meta description and meta keywords. ` +
+            `If the current values are already good, you may keep them mostly the same ` +
+            `but still return all fields.`
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 300
+    });
+
+    const text = response.choices[0]?.message?.content || "";
+    let cleaned = cleanText(text);
+    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+
+    const parsed = JSON.parse(cleaned);
+    return {
+      title: parsed.title || "",
+      metaDescription: parsed.metaDescription || "",
+      metaKeywords: parsed.metaKeywords || "",
+      reason: parsed.reason || ""
+    };
+  } catch (err) {
+    console.log(`⚠️  AI suggestMetaForPage failed for ${pageData.url}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Generate prioritized, site-wide SEO improvement suggestions based on
+ * the analyzed pages and keyword analysis. Returns an array of
+ * { title, detail, priority } objects, or [] on failure.
+ */
+async function generateSiteSuggestions(analyzedPages, keywordData = {}) {
+  try {
+    const openai = getClient();
+
+    const totalPages = analyzedPages.length;
+    const avgScore = totalPages
+      ? Math.round(analyzedPages.reduce((s, p) => s + p.seoScore, 0) / totalPages)
+      : 0;
+
+    // Count issue types across the site
+    const issueCounts = {};
+    for (const page of analyzedPages) {
+      for (const issue of page.issues || []) {
+        issueCounts[issue.type] = (issueCounts[issue.type] || 0) + 1;
+      }
+    }
+
+    const topIssues = Object.entries(issueCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([type, count]) => `${type} (${count} pages)`)
+      .join(", ");
+
+    const topKeywords = (keywordData.topKeywords || [])
+      .slice(0, 10)
+      .map((k) => `${k.keyword} (used on ${k.pageCount} pages)`)
+      .join(", ");
+
+    const longTail = (keywordData.longTailKeywords || [])
+      .slice(0, 10)
+      .map((k) => `"${k.phrase}"`)
+      .join(", ");
+
+    const lowestScoringPages = [...analyzedPages]
+      .sort((a, b) => a.seoScore - b.seoScore)
+      .slice(0, 5)
+      .map((p) => `${p.url} (score ${p.seoScore}/100, ${(p.issues || []).length} issues)`)
+      .join("\n");
+
+    const summary = [
+      `Total pages crawled: ${totalPages}`,
+      `Average SEO score: ${avgScore}/100`,
+      `Most common issues across the site: ${topIssues || "none"}`,
+      `Top recurring keywords/topics: ${topKeywords || "none detected"}`,
+      `Long-tail keyword opportunities: ${longTail || "none detected"}`,
+      `Lowest-scoring pages:\n${lowestScoringPages || "none"}`
+    ].join("\n");
+
+    const response = await openai.chat.completions.create({
+      model: config.OPENAI_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a senior SEO consultant reviewing a full site audit. " +
+            "Reply with ONLY a valid JSON array (no markdown fences) of 5-8 objects, " +
+            'each shaped as {"title": "short action title", "detail": "1-3 sentence explanation/recommendation", "priority": "high"|"medium"|"low"}. ' +
+            "Order from highest to lowest priority."
+        },
+        {
+          role: "user",
+          content:
+            `Here is a summary of an on-page SEO audit for a WordPress website:\n\n${summary}\n\n` +
+            `Based on this, provide prioritized, actionable SEO improvement suggestions ` +
+            `covering on-page fixes, content/keyword strategy (including how to use the ` +
+            `long-tail keyword opportunities), and overall site health.`
+        }
+      ],
+      temperature: 0.6,
+      max_tokens: 700
+    });
+
+    const text = response.choices[0]?.message?.content || "";
+    let cleaned = cleanText(text);
+    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+
+    const parsed = JSON.parse(cleaned);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.log(`⚠️  AI generateSiteSuggestions failed: ${err.message}`);
+    return [];
+  }
+}
+
 module.exports = {
   generateTitle,
   generateMetaDescription,
   generateAltText,
-  generateSchema
+  generateSchema,
+  suggestMetaForPage,
+  generateSiteSuggestions
 };

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sites - SEO Automation</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>🌐 Sites</h1>
+        <div class="site-url">Manage the WordPress sites you audit</div>
+      </div>
+      <a class="settings-link" href="/logout">🚪 Logout</a>
+    </div>
+
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/sites" class="active">Sites</a>
+      <a href="/settings">Settings</a>
+    </div>
+
+    <div class="sites-list" id="sitesList"></div>
+
+    <div class="section">
+      <h2 id="formTitle">➕ Add a Site</h2>
+      <form id="siteForm">
+        <input type="hidden" id="siteId" value="" />
+        <div class="field">
+          <label for="name">Site Name</label>
+          <input type="text" id="name" name="name" placeholder="My Website" required />
+        </div>
+        <div class="field">
+          <label for="siteUrl">Site URL</label>
+          <input type="text" id="siteUrl" name="siteUrl" placeholder="https://example.com" required />
+        </div>
+        <div class="field">
+          <label for="wpApiUrl">WordPress REST API URL (optional)</label>
+          <input type="text" id="wpApiUrl" name="wpApiUrl" placeholder="https://example.com/wp-json/wp/v2" />
+          <p class="help">Leave blank to auto-derive from the site URL.</p>
+        </div>
+        <div class="field">
+          <label for="wpUsername">WordPress Username</label>
+          <input type="text" id="wpUsername" name="wpUsername" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="wpAppPassword">WordPress Application Password</label>
+          <input type="password" id="wpAppPassword" name="wpAppPassword" placeholder="Leave blank to keep current" autocomplete="off" />
+          <p class="help">WP Admin -> Users -> Profile -> Application Passwords -> Add New.</p>
+        </div>
+        <div class="field">
+          <label for="maxPages">Max Pages to Crawl</label>
+          <input type="number" id="maxPages" name="maxPages" min="1" max="2000" value="200" />
+        </div>
+        <button type="submit" id="submitBtn">Add Site</button>
+        <button type="button" id="cancelBtn" class="btn-secondary" style="display:none;">Cancel</button>
+      </form>
+    </div>
+
+    <p class="back"><a href="/">&larr; Back to Dashboard</a></p>
+  </div>
+
+  <script>
+    const sitesList = document.getElementById('sitesList');
+    const form = document.getElementById('siteForm');
+    const siteIdField = document.getElementById('siteId');
+    const formTitle = document.getElementById('formTitle');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    async function loadSites() {
+      const res = await fetch('/api/sites');
+      const data = await res.json();
+      const sites = data.sites || [];
+
+      if (sites.length === 0) {
+        sitesList.innerHTML = '<p class="help">No sites yet. Add one below.</p>';
+        return;
+      }
+
+      sitesList.innerHTML = sites.map((s) => `
+        <div class="site-card">
+          <h3>${s.name}</h3>
+          <div class="meta">
+            <a href="${s.siteUrl}" target="_blank">${s.siteUrl}</a><br/>
+            API: ${s.wpApiUrl}<br/>
+            WP user: ${s.wpUsername || '(not set)'} | App password: ${s.wpAppPasswordSet ? '✅ set' : '⚠️ not set'} | Max pages: ${s.maxPages}
+          </div>
+          <div class="row">
+            <button class="btn-secondary btn-small" onclick='editSite(${JSON.stringify(s).replace(/'/g, "&#39;")})'>✏️ Edit</button>
+            <button class="btn-danger btn-small" onclick="deleteSite('${s.id}', '${s.name.replace(/'/g, "\\'")}')">🗑️ Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function editSite(site) {
+      siteIdField.value = site.id;
+      document.getElementById('name').value = site.name;
+      document.getElementById('siteUrl').value = site.siteUrl;
+      document.getElementById('wpApiUrl').value = site.wpApiUrl;
+      document.getElementById('wpUsername').value = site.wpUsername || '';
+      document.getElementById('wpAppPassword').value = '';
+      document.getElementById('maxPages').value = site.maxPages;
+
+      formTitle.textContent = `✏️ Edit Site: ${site.name}`;
+      submitBtn.textContent = 'Save Changes';
+      cancelBtn.style.display = 'inline-block';
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      siteIdField.value = '';
+      form.reset();
+      document.getElementById('maxPages').value = 200;
+      formTitle.textContent = '➕ Add a Site';
+      submitBtn.textContent = 'Add Site';
+      cancelBtn.style.display = 'none';
+    }
+
+    async function deleteSite(id, name) {
+      if (!confirm(`Delete site "${name}"? This cannot be undone.`)) return;
+      await fetch(`/api/sites/${id}`, { method: 'DELETE' });
+      loadSites();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        name: document.getElementById('name').value,
+        siteUrl: document.getElementById('siteUrl').value,
+        wpApiUrl: document.getElementById('wpApiUrl').value,
+        wpUsername: document.getElementById('wpUsername').value,
+        wpAppPassword: document.getElementById('wpAppPassword').value,
+        maxPages: document.getElementById('maxPages').value
+      };
+
+      const id = siteIdField.value;
+
+      if (id) {
+        await fetch(`/api/sites/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await fetch('/api/sites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      resetForm();
+      loadSites();
+    });
+
+    cancelBtn.addEventListener('click', resetForm);
+
+    loadSites();
+  </script>
+</body>
+</html>

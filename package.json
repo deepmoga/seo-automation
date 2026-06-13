@@ -10,7 +10,12 @@
     "crawl-only": "node index.js --crawl-only",
     "setup": "node setup.js"
   },
-  "keywords": ["seo", "wordpress", "automation", "openai"],
+  "keywords": [
+    "seo",
+    "wordpress",
+    "automation",
+    "openai"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -18,6 +23,7 @@
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "express-session": "^1.19.0",
     "openai": "^4.67.3"
   }
 }
