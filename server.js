@@ -151,6 +151,7 @@ function publicSite(site) {
     wpApiUrl: site.wpApiUrl,
     wpUsername: site.wpUsername,
     wpAppPasswordSet: !!site.wpAppPassword,
+    wpLoginUrl: site.wpLoginUrl || `${site.siteUrl.replace(/\/+$/, "")}/wp-admin`,
     maxPages: site.maxPages,
     schedule: site.schedule || "off",
     scheduleAutoFix: !!site.scheduleAutoFix,

@@ -54,6 +54,11 @@
               <p class="help">Leave blank to auto-derive from the site URL.</p>
             </div>
             <div class="field">
+              <label for="wpLoginUrl">WordPress Login URL</label>
+              <input type="text" id="wpLoginUrl" name="wpLoginUrl" placeholder="https://example.com/wp-admin" />
+              <p class="help">If the developer changed the default /wp-admin login page, enter the custom login URL here.</p>
+            </div>
+            <div class="field">
               <label for="wpUsername">WordPress Username</label>
               <input type="text" id="wpUsername" name="wpUsername" autocomplete="off" />
             </div>
@@ -117,6 +122,7 @@
             Schedule: ${s.schedule === 'off' ? 'Off' : (s.schedule === 'daily' ? 'Daily (2:00 AM)' : 'Weekly (Mon 2:00 AM)')}${s.schedule !== 'off' && s.scheduleAutoFix ? ' + AI auto-fix' : ''}
           </div>
           <div class="row">
+            <a href="${s.wpLoginUrl}" target="_blank"><button type="button" class="btn-secondary btn-small">🔐 WP Login</button></a>
             <button class="btn-secondary btn-small" onclick='editSite(${JSON.stringify(s).replace(/'/g, "&#39;")})'>✏️ Edit</button>
             <button class="btn-danger btn-small" onclick="deleteSite('${s.id}', '${s.name.replace(/'/g, "\\'")}')">🗑️ Delete</button>
           </div>
@@ -129,6 +135,7 @@
       document.getElementById('name').value = site.name;
       document.getElementById('siteUrl').value = site.siteUrl;
       document.getElementById('wpApiUrl').value = site.wpApiUrl;
+      document.getElementById('wpLoginUrl').value = site.wpLoginUrl || '';
       document.getElementById('wpUsername').value = site.wpUsername || '';
       document.getElementById('wpAppPassword').value = '';
       document.getElementById('maxPages').value = site.maxPages;
@@ -165,6 +172,7 @@
         name: document.getElementById('name').value,
         siteUrl: document.getElementById('siteUrl').value,
         wpApiUrl: document.getElementById('wpApiUrl').value,
+        wpLoginUrl: document.getElementById('wpLoginUrl').value,
         wpUsername: document.getElementById('wpUsername').value,
         wpAppPassword: document.getElementById('wpAppPassword').value,
         maxPages: document.getElementById('maxPages').value,

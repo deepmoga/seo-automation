@@ -73,6 +73,7 @@ function addSite(data) {
     wpApiUrl: (data.wpApiUrl || "").trim() || deriveWpApiUrl(siteUrl),
     wpUsername: (data.wpUsername || "").trim(),
     wpAppPassword: (data.wpAppPassword || "").trim(),
+    wpLoginUrl: (data.wpLoginUrl || "").trim() || `${siteUrl}/wp-admin`,
     maxPages: Number(data.maxPages) > 0 ? Number(data.maxPages) : config.MAX_PAGES,
     schedule: ["off", "daily", "weekly"].includes(data.schedule) ? data.schedule : "off",
     scheduleAutoFix: !!data.scheduleAutoFix,
@@ -110,6 +111,9 @@ function updateSite(id, data) {
     wpAppPassword: data.wpAppPassword !== undefined && data.wpAppPassword.trim()
       ? data.wpAppPassword.trim()
       : existing.wpAppPassword,
+    wpLoginUrl: data.wpLoginUrl !== undefined && data.wpLoginUrl.trim()
+      ? data.wpLoginUrl.trim()
+      : (existing.wpLoginUrl || `${siteUrl}/wp-admin`),
     maxPages: data.maxPages !== undefined && Number(data.maxPages) > 0
       ? Number(data.maxPages)
       : existing.maxPages,
