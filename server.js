@@ -74,6 +74,8 @@ function renderLoginPage(error = "") {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login - SEO Automation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -299,18 +301,45 @@ function renderSettingsPage(message = "") {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Settings - SEO Automation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="card">
-    <h1>🔑 Settings</h1>
-    <p class="subtitle">Global credentials &amp; login. Per-site WordPress credentials are managed on the <a href="/sites" style="color:#38bdf8;">Sites</a> page.</p>
-    ${messageHtml}
-    <form method="POST" action="/settings">
-      ${fieldsHtml}
-      <button type="submit">Save Settings</button>
-    </form>
-    <p class="back"><a href="/">&larr; Back to Dashboard</a></p>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">🤖</span>
+        <span class="brand-name">SEO Automation</span>
+      </div>
+      <nav class="side-nav">
+        <a href="/"><span class="icon">📊</span>Dashboard</a>
+        <a href="/sites"><span class="icon">🌐</span>Sites</a>
+        <a href="/settings" class="active"><span class="icon">⚙️</span>Settings</a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/logout"><span class="icon">🚪</span>Logout</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="content">
+        <div class="topbar">
+          <div>
+            <h1>Settings</h1>
+            <div class="page-subtitle muted">Global credentials &amp; login. Per-site WordPress credentials are managed on the <a href="/sites" style="color:#38bdf8;">Sites</a> page.</div>
+          </div>
+        </div>
+
+        <div class="section">
+          ${messageHtml}
+          <form method="POST" action="/settings">
+            ${fieldsHtml}
+            <button type="submit">Save Settings</button>
+          </form>
+        </div>
+      </div>
+    </main>
   </div>
 </body>
 </html>`;

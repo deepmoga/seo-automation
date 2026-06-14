@@ -3,3 +3,4 @@ node_modules/
 report.json
 data/
 reports/
+.claude/

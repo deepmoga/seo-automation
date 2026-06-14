@@ -4,77 +4,89 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sites - SEO Automation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1>🌐 Sites</h1>
-        <div class="site-url">Manage the WordPress sites you audit</div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">🤖</span>
+        <span class="brand-name">SEO Automation</span>
       </div>
-      <a class="settings-link" href="/logout">🚪 Logout</a>
-    </div>
+      <nav class="side-nav">
+        <a href="/"><span class="icon">📊</span>Dashboard</a>
+        <a href="/sites" class="active"><span class="icon">🌐</span>Sites</a>
+        <a href="/settings"><span class="icon">⚙️</span>Settings</a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/logout"><span class="icon">🚪</span>Logout</a>
+      </div>
+    </aside>
 
-    <div class="nav-links">
-      <a href="/">Dashboard</a>
-      <a href="/sites" class="active">Sites</a>
-      <a href="/settings">Settings</a>
-    </div>
+    <main class="main">
+      <div class="content">
+        <div class="topbar">
+          <div>
+            <h1>Sites</h1>
+            <div class="page-subtitle muted">Manage the WordPress sites you audit</div>
+          </div>
+        </div>
 
-    <div class="sites-list" id="sitesList"></div>
+        <div class="sites-list" id="sitesList"></div>
 
-    <div class="section">
-      <h2 id="formTitle">➕ Add a Site</h2>
-      <form id="siteForm">
-        <input type="hidden" id="siteId" value="" />
-        <div class="field">
-          <label for="name">Site Name</label>
-          <input type="text" id="name" name="name" placeholder="My Website" required />
+        <div class="section">
+          <h2 id="formTitle">➕ Add a Site</h2>
+          <form id="siteForm">
+            <input type="hidden" id="siteId" value="" />
+            <div class="field">
+              <label for="name">Site Name</label>
+              <input type="text" id="name" name="name" placeholder="My Website" required />
+            </div>
+            <div class="field">
+              <label for="siteUrl">Site URL</label>
+              <input type="text" id="siteUrl" name="siteUrl" placeholder="https://example.com" required />
+            </div>
+            <div class="field">
+              <label for="wpApiUrl">WordPress REST API URL (optional)</label>
+              <input type="text" id="wpApiUrl" name="wpApiUrl" placeholder="https://example.com/wp-json/wp/v2" />
+              <p class="help">Leave blank to auto-derive from the site URL.</p>
+            </div>
+            <div class="field">
+              <label for="wpUsername">WordPress Username</label>
+              <input type="text" id="wpUsername" name="wpUsername" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="wpAppPassword">WordPress Application Password</label>
+              <input type="password" id="wpAppPassword" name="wpAppPassword" placeholder="Leave blank to keep current" autocomplete="off" />
+              <p class="help">WP Admin -> Users -> Profile -> Application Passwords -> Add New.</p>
+            </div>
+            <div class="field">
+              <label for="maxPages">Max Pages to Crawl</label>
+              <input type="number" id="maxPages" name="maxPages" min="1" max="2000" value="200" />
+            </div>
+            <div class="field">
+              <label for="schedule">Automatic Audit Schedule</label>
+              <select id="schedule" name="schedule">
+                <option value="off">Off (manual only)</option>
+                <option value="daily">Daily (2:00 AM)</option>
+                <option value="weekly">Weekly (Monday 2:00 AM)</option>
+              </select>
+              <p class="help">Runs automatically in the background and records score history.</p>
+            </div>
+            <div class="field">
+              <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+                <input type="checkbox" id="scheduleAutoFix" name="scheduleAutoFix" style="width:auto;" />
+                Also run AI auto-fix automatically (applies changes to WordPress without confirmation)
+              </label>
+            </div>
+            <button type="submit" id="submitBtn">Add Site</button>
+            <button type="button" id="cancelBtn" class="btn-secondary" style="display:none;">Cancel</button>
+          </form>
         </div>
-        <div class="field">
-          <label for="siteUrl">Site URL</label>
-          <input type="text" id="siteUrl" name="siteUrl" placeholder="https://example.com" required />
-        </div>
-        <div class="field">
-          <label for="wpApiUrl">WordPress REST API URL (optional)</label>
-          <input type="text" id="wpApiUrl" name="wpApiUrl" placeholder="https://example.com/wp-json/wp/v2" />
-          <p class="help">Leave blank to auto-derive from the site URL.</p>
-        </div>
-        <div class="field">
-          <label for="wpUsername">WordPress Username</label>
-          <input type="text" id="wpUsername" name="wpUsername" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label for="wpAppPassword">WordPress Application Password</label>
-          <input type="password" id="wpAppPassword" name="wpAppPassword" placeholder="Leave blank to keep current" autocomplete="off" />
-          <p class="help">WP Admin -> Users -> Profile -> Application Passwords -> Add New.</p>
-        </div>
-        <div class="field">
-          <label for="maxPages">Max Pages to Crawl</label>
-          <input type="number" id="maxPages" name="maxPages" min="1" max="2000" value="200" />
-        </div>
-        <div class="field">
-          <label for="schedule">Automatic Audit Schedule</label>
-          <select id="schedule" name="schedule">
-            <option value="off">Off (manual only)</option>
-            <option value="daily">Daily (2:00 AM)</option>
-            <option value="weekly">Weekly (Monday 2:00 AM)</option>
-          </select>
-          <p class="help">Runs automatically in the background and records score history.</p>
-        </div>
-        <div class="field">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
-            <input type="checkbox" id="scheduleAutoFix" name="scheduleAutoFix" style="width:auto;" />
-            Also run AI auto-fix automatically (applies changes to WordPress without confirmation)
-          </label>
-        </div>
-        <button type="submit" id="submitBtn">Add Site</button>
-        <button type="button" id="cancelBtn" class="btn-secondary" style="display:none;">Cancel</button>
-      </form>
-    </div>
-
-    <p class="back"><a href="/">&larr; Back to Dashboard</a></p>
+      </div>
+    </main>
   </div>
 
   <script>

@@ -4,84 +4,148 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SEO Automation Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1>🤖 SEO Automation Dashboard</h1>
-        <div class="site-url" id="siteUrl">Loading...</div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">🤖</span>
+        <span class="brand-name">SEO Automation</span>
       </div>
-      <a class="settings-link" href="/logout">🚪 Logout</a>
-    </div>
+      <nav class="side-nav">
+        <a href="/" class="active"><span class="icon">📊</span>Dashboard</a>
+        <a href="/sites"><span class="icon">🌐</span>Sites</a>
+        <a href="/settings"><span class="icon">⚙️</span>Settings</a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/logout"><span class="icon">🚪</span>Logout</a>
+      </div>
+    </aside>
 
-    <div class="nav-links">
-      <a href="/" class="active">Dashboard</a>
-      <a href="/sites">Sites</a>
-      <a href="/settings">Settings</a>
-    </div>
-
-    <div class="field" style="max-width:400px;">
-      <label for="siteSelect">Site</label>
-      <select id="siteSelect"></select>
-    </div>
-
-    <div class="actions">
-      <button id="btnAudit">🔎 Run Audit (Crawl + Analyze)</button>
-      <button id="btnAuditFix">🔧 Run Audit + AI Auto-Fix</button>
-      <button id="btnSuggestions">💡 Generate SEO Suggestions</button>
-      <button id="btnMetaSuggestions">📝 Generate Meta Suggestions</button>
-    </div>
-
-    <div class="status-bar">
-      Status: <span class="badge idle" id="statusBadge">idle</span>
-      <span id="statusMeta"></span>
-    </div>
-
-    <div class="logs" id="logs">No logs yet. Run an audit to get started.</div>
-
-    <div class="summary" id="summary"></div>
-
-    <table id="reportTable" style="display:none;">
-      <thead>
-        <tr>
-          <th>Page URL</th>
-          <th>SEO Score</th>
-          <th>Issues</th>
-        </tr>
-      </thead>
-      <tbody id="reportBody"></tbody>
-    </table>
-
-    <div class="section" id="historySection" style="display:none;">
-      <h2>📈 Score History</h2>
-      <div id="historyList"></div>
-    </div>
-
-    <div class="section" id="suggestionsSection" style="display:none;">
-      <h2>💡 SEO Improvement Suggestions</h2>
-      <div id="suggestionsList"></div>
-    </div>
-
-    <div class="section" id="keywordsSection" style="display:none;">
-      <h2>🔑 Keyword Analysis</h2>
-      <div class="kw-grid">
-        <div>
-          <h3>Main Keywords</h3>
-          <ul class="kw-list" id="topKeywordsList"></ul>
+    <main class="main">
+      <div class="content">
+        <div class="topbar">
+          <div>
+            <h1>Dashboard</h1>
+            <div class="page-subtitle muted" id="siteUrl">Loading...</div>
+          </div>
+          <div class="topbar-right">
+            <div class="site-select-wrap">
+              <select id="siteSelect"></select>
+            </div>
+          </div>
         </div>
-        <div>
-          <h3>Long-Tail Keyword Opportunities</h3>
-          <ul class="kw-list" id="longTailList"></ul>
+
+        <div class="actions">
+          <button id="btnAudit" class="primary">🔎 Run Audit</button>
+          <button id="btnAuditFix">🔧 Audit + AI Auto-Fix</button>
+          <button id="btnSuggestions">💡 SEO Suggestions</button>
+          <button id="btnMetaSuggestions">📝 Meta Suggestions</button>
+        </div>
+
+        <div class="status-bar">
+          Status: <span class="badge idle" id="statusBadge">idle</span>
+          <span id="statusMeta"></span>
+        </div>
+
+        <div class="logs" id="logs">No logs yet. Run an audit to get started.</div>
+
+        <div class="stats-grid" id="statsGrid" style="display:none;">
+          <div class="stat-card">
+            <div class="stat-icon blue">📄</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statPages">0</div>
+              <div class="stat-label">Pages Crawled</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon indigo">📈</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statScore">0</div>
+              <div class="stat-label">Avg SEO Score</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red">🔴</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statCritical">0</div>
+              <div class="stat-label">Critical Issues</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon amber">🟡</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statWarning">0</div>
+              <div class="stat-label">Warnings</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon sky">🔵</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statInfo">0</div>
+              <div class="stat-label">Info Notices</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="charts-grid" id="chartsGrid" style="display:none;">
+          <div class="chart-card">
+            <h3>Score History</h3>
+            <div class="chart-wrap"><canvas id="scoreChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3>Issue Breakdown</h3>
+            <div class="chart-wrap"><canvas id="issuesChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="table-card" id="tableCard" style="display:none;">
+          <table id="reportTable">
+            <thead>
+              <tr>
+                <th>Page URL</th>
+                <th>SEO Score</th>
+                <th>Issues</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+          </table>
+        </div>
+
+        <div class="section" id="historySection" style="display:none;">
+          <h2>📈 Score History</h2>
+          <div id="historyList"></div>
+        </div>
+
+        <div class="section" id="suggestionsSection" style="display:none;">
+          <h2>💡 SEO Improvement Suggestions</h2>
+          <div id="suggestionsList"></div>
+        </div>
+
+        <div class="section" id="keywordsSection" style="display:none;">
+          <h2>🔑 Keyword Analysis</h2>
+          <div class="kw-grid">
+            <div>
+              <h3>Main Keywords</h3>
+              <ul class="kw-list" id="topKeywordsList"></ul>
+            </div>
+            <div>
+              <h3>Long-Tail Keyword Opportunities</h3>
+              <ul class="kw-list" id="longTailList"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" id="metaSuggestionsSection" style="display:none;">
+          <h2>📝 Per-Page Meta Suggestions</h2>
+          <div id="metaSuggestionsList"></div>
         </div>
       </div>
-    </div>
-
-    <div class="section" id="metaSuggestionsSection" style="display:none;">
-      <h2>📝 Per-Page Meta Suggestions</h2>
-      <div id="metaSuggestionsList"></div>
-    </div>
+    </main>
   </div>
 
   <script>
@@ -93,7 +157,9 @@
     const statusBadge = document.getElementById('statusBadge');
     const statusMeta = document.getElementById('statusMeta');
     const logsEl = document.getElementById('logs');
-    const summaryEl = document.getElementById('summary');
+    const statsGrid = document.getElementById('statsGrid');
+    const chartsGrid = document.getElementById('chartsGrid');
+    const tableCard = document.getElementById('tableCard');
     const reportTable = document.getElementById('reportTable');
     const reportBody = document.getElementById('reportBody');
     const historySection = document.getElementById('historySection');
@@ -107,6 +173,8 @@
     const metaSuggestionsList = document.getElementById('metaSuggestionsList');
 
     let polling = null;
+    let scoreChart = null;
+    let issuesChart = null;
 
     function currentSiteId() {
       return siteSelect.value;
@@ -147,7 +215,7 @@
       const res = await fetch(`/api/config?siteId=${currentSiteId()}`);
       const data = await res.json();
       document.getElementById('siteUrl').textContent =
-        `Target: ${data.siteUrl} (max ${data.maxPages} pages)`;
+        `${data.name} — ${data.siteUrl} (max ${data.maxPages} pages)`;
     }
 
     function scoreClass(score) {
@@ -159,6 +227,7 @@
     function renderHistory(history) {
       if (!history || history.length === 0) {
         historySection.style.display = 'none';
+        renderScoreChart(null);
         return;
       }
 
@@ -192,6 +261,128 @@
           </tbody>
         </table>
       `;
+
+      renderScoreChart(history);
+    }
+
+    function renderScoreChart(history) {
+      const canvas = document.getElementById('scoreChart');
+      const wrap = canvas.parentElement;
+
+      if (!history || history.length === 0) {
+        if (scoreChart) { scoreChart.destroy(); scoreChart = null; }
+        if (!wrap.querySelector('.chart-empty')) {
+          const empty = document.createElement('div');
+          empty.className = 'chart-empty';
+          empty.textContent = 'No history yet. Run a few audits to see score trends.';
+          wrap.appendChild(empty);
+        }
+        canvas.style.display = 'none';
+        return;
+      }
+
+      const existingEmpty = wrap.querySelector('.chart-empty');
+      if (existingEmpty) existingEmpty.remove();
+      canvas.style.display = 'block';
+
+      const points = [...history].slice(-30);
+      const labels = points.map((h) => new Date(h.date).toLocaleDateString());
+      const scores = points.map((h) => h.avgScore);
+
+      if (scoreChart) {
+        scoreChart.data.labels = labels;
+        scoreChart.data.datasets[0].data = scores;
+        scoreChart.update();
+        return;
+      }
+
+      scoreChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Avg SEO Score',
+            data: scores,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56,189,248,0.12)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3,
+            pointBackgroundColor: '#38bdf8'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              min: 0,
+              max: 100,
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#93a1c4' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#93a1c4', maxRotation: 0, autoSkip: true }
+            }
+          }
+        }
+      });
+    }
+
+    function renderIssuesChart(critical, warning, info) {
+      const canvas = document.getElementById('issuesChart');
+      const wrap = canvas.parentElement;
+      const total = critical + warning + info;
+
+      if (total === 0) {
+        if (issuesChart) { issuesChart.destroy(); issuesChart = null; }
+        if (!wrap.querySelector('.chart-empty')) {
+          const empty = document.createElement('div');
+          empty.className = 'chart-empty';
+          empty.textContent = 'No issues data yet. Run an audit first.';
+          wrap.appendChild(empty);
+        }
+        canvas.style.display = 'none';
+        return;
+      }
+
+      const existingEmpty = wrap.querySelector('.chart-empty');
+      if (existingEmpty) existingEmpty.remove();
+      canvas.style.display = 'block';
+
+      const data = [critical, warning, info];
+
+      if (issuesChart) {
+        issuesChart.data.datasets[0].data = data;
+        issuesChart.update();
+        return;
+      }
+
+      issuesChart = new Chart(canvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Critical', 'Warning', 'Info'],
+          datasets: [{
+            data,
+            backgroundColor: ['#ef4444', '#f59e0b', '#38bdf8'],
+            borderColor: '#141d35',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#93a1c4', boxWidth: 12, padding: 14, font: { size: 12 } }
+            }
+          }
+        }
+      });
     }
 
     async function loadHistory() {
@@ -224,11 +415,11 @@
       keywordsSection.style.display = 'block';
 
       topKeywordsList.innerHTML = (keywords.topKeywords || []).map((k) => `
-        <li><span>${k.keyword}</span><span class="count">${k.frequency} (${k.pageCount} pages)</span></li>
+        <li><span>${k.keyword}</span><span class="count">${k.frequency} · ${k.pageCount}p</span></li>
       `).join('') || '<li>None detected</li>';
 
       longTailList.innerHTML = (keywords.longTailKeywords || []).map((k) => `
-        <li><span>${k.phrase}</span><span class="count">${k.frequency} (${k.pageCount} pages)</span></li>
+        <li><span>${k.phrase}</span><span class="count">${k.frequency} · ${k.pageCount}p</span></li>
       `).join('') || '<li>None detected</li>';
     }
 
@@ -258,8 +449,10 @@
 
     function renderReport(report) {
       if (!report.exists) {
-        summaryEl.innerHTML = '';
-        reportTable.style.display = 'none';
+        statsGrid.style.display = 'none';
+        chartsGrid.style.display = 'none';
+        tableCard.style.display = 'none';
+        renderIssuesChart(0, 0, 0);
         renderSuggestions(null);
         renderKeywords(null);
         renderMetaSuggestions(null);
@@ -280,23 +473,25 @@
         }
       }
 
-      summaryEl.innerHTML = `
-        <div class="stat"><strong>${pages.length}</strong>Pages crawled</div>
-        <div class="stat"><strong>${avgScore}</strong>Avg SEO score</div>
-        <div class="stat"><strong>${critical}</strong>🔴 Critical</div>
-        <div class="stat"><strong>${warning}</strong>🟡 Warning</div>
-        <div class="stat"><strong>${info}</strong>🔵 Info</div>
-      `;
+      statsGrid.style.display = pages.length ? 'grid' : 'none';
+      chartsGrid.style.display = 'grid';
+      document.getElementById('statPages').textContent = pages.length;
+      document.getElementById('statScore').textContent = avgScore;
+      document.getElementById('statCritical').textContent = critical;
+      document.getElementById('statWarning').textContent = warning;
+      document.getElementById('statInfo').textContent = info;
+
+      renderIssuesChart(critical, warning, info);
 
       reportBody.innerHTML = pages.map((p) => `
         <tr>
-          <td><a href="${p.url}" target="_blank" style="color:#94a3b8;text-decoration:none;">${p.url}</a></td>
+          <td><a href="${p.url}" target="_blank" style="color:#93a1c4;text-decoration:none;">${p.url}</a></td>
           <td class="score ${scoreClass(p.seoScore)}">${p.seoScore}/100</td>
           <td>${(p.issues || []).length}</td>
         </tr>
       `).join('');
 
-      reportTable.style.display = pages.length ? 'table' : 'none';
+      tableCard.style.display = pages.length ? 'block' : 'none';
 
       renderSuggestions(report.suggestions);
       renderKeywords(report.keywords);
