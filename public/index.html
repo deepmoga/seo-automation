@@ -146,6 +146,11 @@
           <div id="metaSuggestionsList"></div>
         </div>
 
+        <div class="section" id="fixesSection" style="display:none;">
+          <h2>🔧 AI Auto-Fix Results</h2>
+          <div id="fixesList"></div>
+        </div>
+
         <div class="section" id="brokenLinksSection" style="display:none;">
           <h2>🔗 Broken Links</h2>
           <div id="brokenLinksList"></div>
@@ -224,6 +229,8 @@
     const longTailList = document.getElementById('longTailList');
     const metaSuggestionsSection = document.getElementById('metaSuggestionsSection');
     const metaSuggestionsList = document.getElementById('metaSuggestionsList');
+    const fixesSection = document.getElementById('fixesSection');
+    const fixesList = document.getElementById('fixesList');
     const brokenLinksSection = document.getElementById('brokenLinksSection');
     const brokenLinksList = document.getElementById('brokenLinksList');
     const pageSpeedSection = document.getElementById('pageSpeedSection');
@@ -510,6 +517,43 @@
       `).join('');
     }
 
+    function renderFixes(fixes) {
+      if (!fixes || fixes.length === 0) {
+        fixesSection.style.display = 'none';
+        return;
+      }
+
+      fixesSection.style.display = 'block';
+      fixesList.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Page URL</th>
+              <th>Matched WP Content</th>
+              <th>Title</th>
+              <th>Meta Description</th>
+              <th>Schema</th>
+              <th>Alt Texts Fixed</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${fixes.map((f) => `
+              <tr>
+                <td><a href="${f.url}" target="_blank" style="color:#93a1c4;text-decoration:none;">${f.url}</a></td>
+                <td>${f.found
+                  ? `<span class="score good">✅ ${f.postType || ''}</span>`
+                  : `<span class="score bad">⚠️ Not found</span>`}</td>
+                <td>${f.title ? `<div style="color:#4ade80;">${f.title}</div>` : '-'}</td>
+                <td>${f.metaDescription ? `<div style="color:#4ade80;">${f.metaDescription}</div>` : '-'}</td>
+                <td>${f.schema ? '✅' : '-'}</td>
+                <td>${f.altTextsFixed || 0}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
     function renderBrokenLinks(brokenLinks) {
       if (!brokenLinks || brokenLinks.length === 0) {
         brokenLinksSection.style.display = 'none';
@@ -657,6 +701,7 @@
         renderSuggestions(null);
         renderKeywords(null);
         renderMetaSuggestions(null);
+        renderFixes(null);
         renderBrokenLinks(null);
         renderPageSpeed(null);
         return;
@@ -699,6 +744,7 @@
       renderSuggestions(report.suggestions);
       renderKeywords(report.keywords);
       renderMetaSuggestions(report.metaSuggestions);
+      renderFixes(report.fixes);
       renderBrokenLinks(report.brokenLinks);
       renderPageSpeed(report.pageSpeed, report.pageSpeedCheckedAt);
     }

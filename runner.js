@@ -87,6 +87,8 @@ async function fixPage(page, site = null) {
 
   const fixesApplied = {
     url: page.url,
+    found: false,
+    postType: null,
     title: null,
     metaDescription: null,
     schema: null,
@@ -103,6 +105,9 @@ async function fixPage(page, site = null) {
       console.log(`   ⚠️  Could not find a matching WordPress post/page for ${page.url} - skipping fixes.`);
       return fixesApplied;
     }
+
+    fixesApplied.found = true;
+    fixesApplied.postType = wpPost.type;
 
     let newTitle = null;
     let newMetaDescription = null;
