@@ -89,16 +89,21 @@ async function findPostByUrl(pageUrl, creds = {}) {
     const types = await getSearchableTypes(api, api.defaults.baseURL);
 
     for (const type of types) {
-      try {
-        const { data } = await api.get(`/${type}`, {
-          params: { slug, status: "any" }
-        });
+      // Try without a status filter first - this returns published
+      // content and works even if Basic Auth isn't valid/configured.
+      // "status: any" requires WordPress to recognize the request as
+      // authenticated, and returns 400 Bad Request otherwise, so it's
+      // only used as a fallback for drafts/private posts.
+      for (const params of [{ slug }, { slug, status: "any" }]) {
+        try {
+          const { data } = await api.get(`/${type}`, { params });
 
-        if (Array.isArray(data) && data.length > 0) {
-          return { id: data[0].id, type };
+          if (Array.isArray(data) && data.length > 0) {
+            return { id: data[0].id, type };
+          }
+        } catch (err) {
+          // try next params/type
         }
-      } catch (err) {
-        // try next type
       }
     }
 
