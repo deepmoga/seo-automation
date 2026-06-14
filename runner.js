@@ -9,6 +9,8 @@ const config = require("./config");
 const { crawlSite } = require("./crawler");
 const { analyzePages } = require("./analyzer");
 const { analyzeKeywords } = require("./keywords");
+const { checkBrokenLinks } = require("./link-checker");
+const { runPageSpeedForSite } = require("./pagespeed");
 const ai = require("./ai");
 const fixer = require("./fixer");
 const reporter = require("./reporter");
@@ -52,11 +54,26 @@ async function runAudit(site = null) {
     throw new Error("No pages were crawled.");
   }
 
+  // Check all collected links for broken pages and attach the results
+  // to each page before scoring, so broken-link issues count toward
+  // the SEO score.
+  const brokenLinks = await checkBrokenLinks(pages);
+  const brokenByPage = new Map();
+  for (const broken of brokenLinks) {
+    for (const pageUrl of broken.foundOn) {
+      if (!brokenByPage.has(pageUrl)) brokenByPage.set(pageUrl, []);
+      brokenByPage.get(pageUrl).push({ url: broken.url, status: broken.status });
+    }
+  }
+  for (const page of pages) {
+    page.brokenLinks = brokenByPage.get(page.url) || [];
+  }
+
   const analyzedPages = analyzePages(pages);
   const keywordData = analyzeKeywords(analyzedPages);
 
   reporter.printReport(analyzedPages);
-  reporter.saveReport(analyzedPages, { keywords: keywordData }, siteId);
+  reporter.saveReport(analyzedPages, { keywords: keywordData, brokenLinks }, siteId);
 
   return analyzedPages;
 }
@@ -203,7 +220,8 @@ async function runAutoFix(analyzedPages, site = null) {
   }
 
   const keywordData = analyzeKeywords(analyzedPages);
-  reporter.saveReport(analyzedPages, { fixes: fixResults, keywords: keywordData }, siteId);
+  const existing = reporter.loadReport(siteId) || {};
+  reporter.saveReport(analyzedPages, { ...existing, fixes: fixResults, keywords: keywordData }, siteId);
 
   const totalAltFixed = fixResults.reduce((sum, r) => sum + (r.altTextsFixed || 0), 0);
   const totalTitlesFixed = fixResults.filter((r) => r.title).length;
@@ -277,11 +295,33 @@ async function runMetaSuggestions(analyzedPages, site = null) {
   return metaSuggestions;
 }
 
+/**
+ * Run Google PageSpeed Insights for the first N pages of an
+ * already-analyzed report and save the results into the report.
+ */
+async function runPageSpeed(analyzedPages, site = null) {
+  const siteId = site ? site.id : null;
+  const apiKey = config.PAGESPEED_API_KEY;
+  const maxPages = config.PAGESPEED_MAX_PAGES;
+
+  const pageSpeed = await runPageSpeedForSite(analyzedPages, apiKey, maxPages);
+
+  const existing = reporter.loadReport(siteId) || {};
+  reporter.saveReport(analyzedPages, {
+    ...existing,
+    pageSpeed,
+    pageSpeedCheckedAt: new Date().toISOString()
+  }, siteId);
+
+  return pageSpeed;
+}
+
 module.exports = {
   runAudit,
   runAutoFix,
   runSuggestions,
   runMetaSuggestions,
+  runPageSpeed,
   fixPage,
   delay
 };

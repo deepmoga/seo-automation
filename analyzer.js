@@ -141,6 +141,16 @@ function checkPage(page) {
     });
   }
 
+  // --- Broken links check ---
+  if (page.brokenLinks && page.brokenLinks.length > 0) {
+    issues.push({
+      type: "broken_links",
+      message: `${page.brokenLinks.length} broken link(s) found on this page`,
+      severity: "warning",
+      links: page.brokenLinks
+    });
+  }
+
   return issues;
 }
 

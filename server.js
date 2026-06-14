@@ -16,6 +16,7 @@ const historyStore = require("./history-store");
 const jobs = require("./jobs");
 const scheduler = require("./scheduler");
 const { readEnv, writeEnv, maskValue } = require("./env-store");
+const searchConsole = require("./search-console");
 const fs = require("fs");
 const path = require("path");
 
@@ -152,7 +153,8 @@ function publicSite(site) {
     wpAppPasswordSet: !!site.wpAppPassword,
     maxPages: site.maxPages,
     schedule: site.schedule || "off",
-    scheduleAutoFix: !!site.scheduleAutoFix
+    scheduleAutoFix: !!site.scheduleAutoFix,
+    gscProperty: site.gscProperty || ""
   };
 }
 
@@ -222,7 +224,7 @@ app.get("/api/history", (req, res) => {
 
 // Start a new job for a site
 app.post("/api/run", (req, res) => {
-  const mode = ["audit", "audit-fix", "suggestions", "meta-suggestions"].includes(req.body.mode)
+  const mode = ["audit", "audit-fix", "suggestions", "meta-suggestions", "pagespeed"].includes(req.body.mode)
     ? req.body.mode
     : "audit";
 
@@ -251,6 +253,85 @@ app.get("/api/config", (req, res) => {
 });
 
 // ---------------------------------------------------------------------
+// Google Search Console integration
+// ---------------------------------------------------------------------
+
+function googleRedirectUri(req) {
+  return config.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get("host")}/auth/google/callback`;
+}
+
+// Status (for settings page UI)
+app.get("/api/search-console/status", (req, res) => {
+  res.json({
+    configured: !!(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET),
+    connected: searchConsole.isConnected()
+  });
+});
+
+// List verified Search Console properties (for picking a site's gscProperty)
+app.get("/api/search-console/sites", async (req, res) => {
+  try {
+    const sites = await searchConsole.listSites();
+    res.json({ sites });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Search performance data for a dashboard site
+app.get("/api/search-console", async (req, res) => {
+  const site = sitesStore.getSite(req.query.siteId);
+  if (!site) return res.status(404).json({ error: "Site not found" });
+
+  const property = site.gscProperty || `${site.siteUrl.replace(/\/+$/, "")}/`;
+
+  try {
+    const data = await searchConsole.querySearchAnalytics(property, {
+      days: 28,
+      dimensions: ["query"],
+      rowLimit: 20
+    });
+    res.json({ connected: true, property, ...data });
+  } catch (err) {
+    if (!searchConsole.isConnected()) {
+      return res.json({ connected: false });
+    }
+    res.status(500).json({ connected: true, error: err.message });
+  }
+});
+
+// Start the OAuth flow
+app.get("/auth/google", (req, res) => {
+  if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) {
+    return res.redirect("/settings?gscError=" + encodeURIComponent("Add your Google Client ID/Secret first."));
+  }
+  res.redirect(searchConsole.getAuthUrl(googleRedirectUri(req)));
+});
+
+// OAuth callback
+app.get("/auth/google/callback", async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error || !code) {
+    return res.redirect("/settings?gscError=" + encodeURIComponent(error || "No code returned from Google."));
+  }
+
+  try {
+    await searchConsole.exchangeCode(code, googleRedirectUri(req));
+    res.redirect("/settings?gscConnected=1");
+  } catch (err) {
+    const message = err.response && err.response.data ? JSON.stringify(err.response.data) : err.message;
+    res.redirect("/settings?gscError=" + encodeURIComponent(message));
+  }
+});
+
+// Disconnect Google account
+app.post("/auth/google/disconnect", (req, res) => {
+  searchConsole.disconnect();
+  res.redirect("/settings");
+});
+
+// ---------------------------------------------------------------------
 // Sites management page
 // ---------------------------------------------------------------------
 app.get("/sites", (req, res) => {
@@ -275,10 +356,60 @@ const SETTINGS_FIELDS = [
     key: "ADMIN_PASS",
     label: "Dashboard Login Password",
     help: "Password used to log in to this dashboard."
+  },
+  {
+    key: "PAGESPEED_API_KEY",
+    label: "Google PageSpeed Insights API Key",
+    help: "Free key from Google Cloud Console (enable 'PageSpeed Insights API'). Used for Core Web Vitals checks."
+  },
+  {
+    key: "TELEGRAM_BOT_TOKEN",
+    label: "Telegram Bot Token",
+    help: "Create a bot via @BotFather on Telegram and paste its token here."
+  },
+  {
+    key: "TELEGRAM_CHAT_ID",
+    label: "Telegram Chat ID",
+    help: "Your Telegram user/group/channel chat ID to receive audit alerts."
+  },
+  {
+    key: "SMTP_HOST",
+    label: "SMTP Host",
+    help: "e.g. smtp.gmail.com - for sending email alerts."
+  },
+  {
+    key: "SMTP_PORT",
+    label: "SMTP Port",
+    help: "e.g. 587 (TLS) or 465 (SSL)."
+  },
+  {
+    key: "SMTP_USER",
+    label: "SMTP Username",
+    help: "Usually your email address."
+  },
+  {
+    key: "SMTP_PASS",
+    label: "SMTP Password",
+    help: "App password or SMTP password."
+  },
+  {
+    key: "NOTIFY_EMAIL_TO",
+    label: "Send Alerts To (Email)",
+    help: "Email address that receives audit completion/score-drop alerts."
+  },
+  {
+    key: "GOOGLE_CLIENT_ID",
+    label: "Google OAuth Client ID",
+    help: "From Google Cloud Console (OAuth 2.0 Client). Used to connect Search Console."
+  },
+  {
+    key: "GOOGLE_CLIENT_SECRET",
+    label: "Google OAuth Client Secret",
+    help: "From Google Cloud Console (OAuth 2.0 Client)."
   }
 ];
 
-function renderSettingsPage(message = "") {
+function renderSettingsPage(message = "", extra = {}) {
   const current = readEnv();
 
   const fieldsHtml = SETTINGS_FIELDS.map((field) => {
@@ -294,6 +425,23 @@ function renderSettingsPage(message = "") {
   }).join("\n");
 
   const messageHtml = message ? `<div class="message">${message}</div>` : "";
+
+  const gscConfigured = !!(current.GOOGLE_CLIENT_ID && current.GOOGLE_CLIENT_SECRET);
+  const gscConnected = searchConsole.isConnected();
+
+  let gscStatusHtml;
+  if (extra.gscError) {
+    gscStatusHtml = `<div class="message error">❌ Google connection failed: ${extra.gscError}</div>`;
+  } else if (extra.gscConnected) {
+    gscStatusHtml = `<div class="message">✅ Google account connected successfully.</div>`;
+  }
+
+  const gscActionHtml = !gscConfigured
+    ? `<p class="help">Save your Google OAuth Client ID/Secret above first, then connect.</p>`
+    : gscConnected
+      ? `<p class="help">✅ Connected to Google Search Console.</p>
+         <form method="POST" action="/auth/google/disconnect"><button type="submit" class="btn-secondary">Disconnect Google Account</button></form>`
+      : `<a href="/auth/google"><button type="button">Connect Google Account</button></a>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -333,10 +481,17 @@ function renderSettingsPage(message = "") {
 
         <div class="section">
           ${messageHtml}
+          ${gscStatusHtml || ""}
           <form method="POST" action="/settings">
             ${fieldsHtml}
             <button type="submit">Save Settings</button>
           </form>
+        </div>
+
+        <div class="section">
+          <h2>Google Search Console</h2>
+          <p class="help">Connect your Google account to show real impressions, clicks, CTR and average position on the dashboard.</p>
+          ${gscActionHtml}
         </div>
       </div>
     </main>
@@ -346,7 +501,10 @@ function renderSettingsPage(message = "") {
 }
 
 app.get("/settings", (req, res) => {
-  res.send(renderSettingsPage());
+  res.send(renderSettingsPage("", {
+    gscConnected: req.query.gscConnected === "1",
+    gscError: req.query.gscError || ""
+  }));
 });
 
 app.post("/settings", (req, res) => {

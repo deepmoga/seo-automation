@@ -76,6 +76,7 @@ function addSite(data) {
     maxPages: Number(data.maxPages) > 0 ? Number(data.maxPages) : config.MAX_PAGES,
     schedule: ["off", "daily", "weekly"].includes(data.schedule) ? data.schedule : "off",
     scheduleAutoFix: !!data.scheduleAutoFix,
+    gscProperty: (data.gscProperty || "").trim(),
     createdAt: new Date().toISOString()
   };
 
@@ -113,7 +114,8 @@ function updateSite(id, data) {
       ? Number(data.maxPages)
       : existing.maxPages,
     schedule: ["off", "daily", "weekly"].includes(data.schedule) ? data.schedule : existing.schedule || "off",
-    scheduleAutoFix: data.scheduleAutoFix !== undefined ? !!data.scheduleAutoFix : !!existing.scheduleAutoFix
+    scheduleAutoFix: data.scheduleAutoFix !== undefined ? !!data.scheduleAutoFix : !!existing.scheduleAutoFix,
+    gscProperty: data.gscProperty !== undefined ? data.gscProperty.trim() : (existing.gscProperty || "")
   };
 
   sites[index] = updated;

@@ -41,5 +41,25 @@ module.exports = {
   // Web dashboard settings
   PORT: process.env.PORT || 4600,
   ADMIN_USER: process.env.ADMIN_USER || "admin",
-  ADMIN_PASS: process.env.ADMIN_PASS || "admin"
+  ADMIN_PASS: process.env.ADMIN_PASS || "admin",
+
+  // Google PageSpeed Insights (Core Web Vitals)
+  PAGESPEED_API_KEY: process.env.PAGESPEED_API_KEY || "",
+  PAGESPEED_MAX_PAGES: parseInt(process.env.PAGESPEED_MAX_PAGES, 10) || 5,
+
+  // Telegram bot alerts
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
+  TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || "",
+
+  // Email (SMTP) alerts
+  SMTP_HOST: process.env.SMTP_HOST || "",
+  SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
+  SMTP_USER: process.env.SMTP_USER || "",
+  SMTP_PASS: process.env.SMTP_PASS || "",
+  NOTIFY_EMAIL_TO: process.env.NOTIFY_EMAIL_TO || "",
+
+  // Google OAuth (Search Console)
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+  GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI || ""
 };

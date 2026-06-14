@@ -6,6 +6,9 @@
 const runner = require("./runner");
 const reporter = require("./reporter");
 const historyStore = require("./history-store");
+const notifier = require("./notifier");
+
+const SCORE_CHANGE_THRESHOLD = 5;
 
 const job = {
   status: "idle", // idle | running | done | error
@@ -49,11 +52,15 @@ async function runJob(mode, site) {
   try {
     if (mode === "audit") {
       const analyzedPages = await runner.runAudit(site);
+      const previous = historyStore.getHistory(site.id).slice(-1)[0] || null;
       historyStore.appendHistory(site.id, analyzedPages);
+      await notifyAuditResult(site, analyzedPages, previous);
     } else if (mode === "audit-fix") {
       const analyzedPages = await runner.runAudit(site);
+      const previous = historyStore.getHistory(site.id).slice(-1)[0] || null;
       historyStore.appendHistory(site.id, analyzedPages);
       await runner.runAutoFix(analyzedPages, site);
+      await notifyAuditResult(site, analyzedPages, previous);
     } else if (mode === "suggestions") {
       const existing = reporter.loadReport(site.id);
       if (!existing || !existing.pages) {
@@ -66,6 +73,12 @@ async function runJob(mode, site) {
         throw new Error("No audit report found. Run an audit first.");
       }
       await runner.runMetaSuggestions(existing.pages, site);
+    } else if (mode === "pagespeed") {
+      const existing = reporter.loadReport(site.id);
+      if (!existing || !existing.pages) {
+        throw new Error("No audit report found. Run an audit first.");
+      }
+      await runner.runPageSpeed(existing.pages, site);
     } else {
       throw new Error(`Unknown job mode: ${mode}`);
     }
@@ -75,9 +88,50 @@ async function runJob(mode, site) {
     job.status = "error";
     job.error = err.message;
     pushLog(`❌ ${err.message}`);
+
+    try {
+      await notifier.notify(
+        `❌ SEO Audit Failed: ${site.name || site.siteUrl}`,
+        `The "${mode}" job for ${site.siteUrl} failed:\n${err.message}`
+      );
+    } catch (notifyErr) {
+      pushLog(`⚠️  Failed to send failure notification: ${notifyErr.message}`);
+    }
   } finally {
     console.log = originalLog;
     job.finishedAt = new Date().toISOString();
+  }
+}
+
+/**
+ * Send a Telegram/email summary after an audit completes, including a
+ * score-drop/improvement alert if it changed by more than the threshold.
+ */
+async function notifyAuditResult(site, analyzedPages, previous) {
+  const summary = historyStore.summarize(analyzedPages);
+  const siteName = site.name || site.siteUrl;
+
+  let scoreLine = `Average SEO score: ${summary.avgScore}/100`;
+  if (previous) {
+    const diff = summary.avgScore - previous.avgScore;
+    if (diff <= -SCORE_CHANGE_THRESHOLD) {
+      scoreLine += `\n⚠️ Score dropped by ${Math.abs(diff)} points (was ${previous.avgScore})`;
+    } else if (diff >= SCORE_CHANGE_THRESHOLD) {
+      scoreLine += `\n✅ Score improved by ${diff} points (was ${previous.avgScore})`;
+    }
+  }
+
+  const message = [
+    `Site: ${siteName} (${site.siteUrl})`,
+    `Pages crawled: ${summary.totalPages}`,
+    scoreLine,
+    `Issues - Critical: ${summary.critical}, Warning: ${summary.warning}, Info: ${summary.info}`
+  ].join("\n");
+
+  try {
+    await notifier.notify(`✅ SEO Audit Complete: ${siteName}`, message);
+  } catch (err) {
+    pushLog(`⚠️  Failed to send audit notification: ${err.message}`);
   }
 }
 

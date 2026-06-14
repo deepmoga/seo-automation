@@ -45,6 +45,7 @@
           <button id="btnAuditFix">🔧 Audit + AI Auto-Fix</button>
           <button id="btnSuggestions">💡 SEO Suggestions</button>
           <button id="btnMetaSuggestions">📝 Meta Suggestions</button>
+          <button id="btnPageSpeed">⚡ PageSpeed Check</button>
         </div>
 
         <div class="status-bar">
@@ -144,6 +145,57 @@
           <h2>📝 Per-Page Meta Suggestions</h2>
           <div id="metaSuggestionsList"></div>
         </div>
+
+        <div class="section" id="brokenLinksSection" style="display:none;">
+          <h2>🔗 Broken Links</h2>
+          <div id="brokenLinksList"></div>
+        </div>
+
+        <div class="section" id="pageSpeedSection" style="display:none;">
+          <h2>⚡ PageSpeed / Core Web Vitals</h2>
+          <div class="page-subtitle muted" id="pageSpeedMeta"></div>
+          <div id="pageSpeedList"></div>
+        </div>
+
+        <div class="section" id="gscSection" style="display:none;">
+          <h2>🔍 Google Search Console (last 28 days)</h2>
+          <div class="stats-grid" id="gscStatsGrid">
+            <div class="stat-card">
+              <div class="stat-icon blue">👀</div>
+              <div class="stat-info">
+                <div class="stat-value" id="gscImpressions">0</div>
+                <div class="stat-label">Impressions</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon indigo">🖱️</div>
+              <div class="stat-info">
+                <div class="stat-value" id="gscClicks">0</div>
+                <div class="stat-label">Clicks</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon sky">📊</div>
+              <div class="stat-info">
+                <div class="stat-value" id="gscCtr">0%</div>
+                <div class="stat-label">Avg CTR</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon amber">📍</div>
+              <div class="stat-info">
+                <div class="stat-value" id="gscPosition">0</div>
+                <div class="stat-label">Avg Position</div>
+              </div>
+            </div>
+          </div>
+          <div id="gscQueriesList"></div>
+        </div>
+
+        <div class="section" id="gscDisconnectedSection" style="display:none;">
+          <h2>🔍 Google Search Console</h2>
+          <p class="page-subtitle muted">Not connected. Connect your Google account on the <a href="/settings" style="color:#38bdf8;">Settings</a> page to see real impressions, clicks, CTR and average position here.</p>
+        </div>
       </div>
     </main>
   </div>
@@ -154,6 +206,7 @@
     const btnAuditFix = document.getElementById('btnAuditFix');
     const btnSuggestions = document.getElementById('btnSuggestions');
     const btnMetaSuggestions = document.getElementById('btnMetaSuggestions');
+    const btnPageSpeed = document.getElementById('btnPageSpeed');
     const statusBadge = document.getElementById('statusBadge');
     const statusMeta = document.getElementById('statusMeta');
     const logsEl = document.getElementById('logs');
@@ -171,6 +224,14 @@
     const longTailList = document.getElementById('longTailList');
     const metaSuggestionsSection = document.getElementById('metaSuggestionsSection');
     const metaSuggestionsList = document.getElementById('metaSuggestionsList');
+    const brokenLinksSection = document.getElementById('brokenLinksSection');
+    const brokenLinksList = document.getElementById('brokenLinksList');
+    const pageSpeedSection = document.getElementById('pageSpeedSection');
+    const pageSpeedMeta = document.getElementById('pageSpeedMeta');
+    const pageSpeedList = document.getElementById('pageSpeedList');
+    const gscSection = document.getElementById('gscSection');
+    const gscDisconnectedSection = document.getElementById('gscDisconnectedSection');
+    const gscQueriesList = document.getElementById('gscQueriesList');
 
     let polling = null;
     let scoreChart = null;
@@ -202,6 +263,7 @@
       await loadConfig();
       await loadReport();
       await loadHistory();
+      await loadSearchConsole();
     }
 
     siteSelect.addEventListener('change', async () => {
@@ -209,6 +271,7 @@
       await loadConfig();
       await loadReport();
       await loadHistory();
+      await loadSearchConsole();
     });
 
     async function loadConfig() {
@@ -447,6 +510,144 @@
       `).join('');
     }
 
+    function renderBrokenLinks(brokenLinks) {
+      if (!brokenLinks || brokenLinks.length === 0) {
+        brokenLinksSection.style.display = 'none';
+        return;
+      }
+
+      brokenLinksSection.style.display = 'block';
+      brokenLinksList.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Broken URL</th>
+              <th>Status</th>
+              <th>Found On</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${brokenLinks.map((b) => `
+              <tr>
+                <td><a href="${b.url}" target="_blank" style="color:#93a1c4;text-decoration:none;">${b.url}</a></td>
+                <td class="score bad">${b.status || 'error'}</td>
+                <td>${(b.foundOn || []).slice(0, 3).map((u) => `<div>${u}</div>`).join('')}${(b.foundOn || []).length > 3 ? `<div>+ ${b.foundOn.length - 3} more</div>` : ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderPageSpeed(pageSpeed, checkedAt) {
+      if (!pageSpeed || pageSpeed.length === 0) {
+        pageSpeedSection.style.display = 'none';
+        return;
+      }
+
+      pageSpeedSection.style.display = 'block';
+      pageSpeedMeta.textContent = checkedAt
+        ? `Last checked: ${new Date(checkedAt).toLocaleString()} (mobile, first ${pageSpeed.length} page(s))`
+        : '';
+
+      pageSpeedList.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Page URL</th>
+              <th>Performance</th>
+              <th>SEO</th>
+              <th>Accessibility</th>
+              <th>Best Practices</th>
+              <th>LCP</th>
+              <th>CLS</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pageSpeed.map((p) => {
+              if (p.error) {
+                return `
+                  <tr>
+                    <td><a href="${p.url}" target="_blank" style="color:#93a1c4;text-decoration:none;">${p.url}</a></td>
+                    <td colspan="6" class="score bad">Error: ${p.error}</td>
+                  </tr>
+                `;
+              }
+              const s = p.scores || {};
+              const v = p.vitals || {};
+              return `
+                <tr>
+                  <td><a href="${p.url}" target="_blank" style="color:#93a1c4;text-decoration:none;">${p.url}</a></td>
+                  <td class="score ${scoreClass(s.performance)}">${s.performance ?? '-'}</td>
+                  <td class="score ${scoreClass(s.seo)}">${s.seo ?? '-'}</td>
+                  <td class="score ${scoreClass(s.accessibility)}">${s.accessibility ?? '-'}</td>
+                  <td class="score ${scoreClass(s.bestPractices)}">${s.bestPractices ?? '-'}</td>
+                  <td>${v.lcp || '-'}</td>
+                  <td>${v.cls || '-'}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function loadSearchConsole() {
+      try {
+        const res = await fetch(`/api/search-console?siteId=${currentSiteId()}`);
+        const data = await res.json();
+
+        if (!data.connected) {
+          gscSection.style.display = 'none';
+          gscDisconnectedSection.style.display = 'block';
+          return;
+        }
+
+        gscDisconnectedSection.style.display = 'none';
+
+        if (data.error) {
+          gscSection.style.display = 'none';
+          return;
+        }
+
+        gscSection.style.display = 'block';
+        const totals = data.totals || {};
+        document.getElementById('gscImpressions').textContent = Math.round(totals.impressions || 0).toLocaleString();
+        document.getElementById('gscClicks').textContent = Math.round(totals.clicks || 0).toLocaleString();
+        document.getElementById('gscCtr').textContent = ((totals.ctr || 0) * 100).toFixed(1) + '%';
+        document.getElementById('gscPosition').textContent = (totals.position || 0).toFixed(1);
+
+        const rows = data.rows || [];
+        gscQueriesList.innerHTML = rows.length ? `
+          <table>
+            <thead>
+              <tr>
+                <th>Query</th>
+                <th>Clicks</th>
+                <th>Impressions</th>
+                <th>CTR</th>
+                <th>Avg Position</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r) => `
+                <tr>
+                  <td>${r.keys[0]}</td>
+                  <td>${r.clicks}</td>
+                  <td>${r.impressions}</td>
+                  <td>${(r.ctr * 100).toFixed(1)}%</td>
+                  <td>${r.position.toFixed(1)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : '<p class="page-subtitle muted">No query data yet.</p>';
+      } catch (err) {
+        gscSection.style.display = 'none';
+        gscDisconnectedSection.style.display = 'none';
+      }
+    }
+
     function renderReport(report) {
       if (!report.exists) {
         statsGrid.style.display = 'none';
@@ -456,6 +657,8 @@
         renderSuggestions(null);
         renderKeywords(null);
         renderMetaSuggestions(null);
+        renderBrokenLinks(null);
+        renderPageSpeed(null);
         return;
       }
 
@@ -496,6 +699,8 @@
       renderSuggestions(report.suggestions);
       renderKeywords(report.keywords);
       renderMetaSuggestions(report.metaSuggestions);
+      renderBrokenLinks(report.brokenLinks);
+      renderPageSpeed(report.pageSpeed, report.pageSpeedCheckedAt);
     }
 
     async function loadReport() {
@@ -525,6 +730,7 @@
       btnAuditFix.disabled = running;
       btnSuggestions.disabled = running;
       btnMetaSuggestions.disabled = running;
+      btnPageSpeed.disabled = running;
 
       if (data.status === 'done' || data.status === 'error') {
         if (polling) {
@@ -572,6 +778,7 @@
         startJob('meta-suggestions');
       }
     });
+    btnPageSpeed.addEventListener('click', () => startJob('pagespeed'));
 
     loadSites();
     poll();

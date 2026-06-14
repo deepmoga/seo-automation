@@ -144,6 +144,10 @@ function extractPageData(html, pageUrl) {
   const baseHost = new URL(pageUrl).host;
   const internalLinks = [];
 
+  // All links (internal + external) for broken-link checking
+  const links = [];
+  const seenLinks = new Set();
+
   $("a[href]").each((i, el) => {
     const href = $(el).attr("href");
     const normalized = normalizeUrl(href, pageUrl);
@@ -152,6 +156,24 @@ function extractPageData(html, pageUrl) {
         const linkHost = new URL(normalized).host;
         if (linkHost === baseHost) {
           internalLinks.push(normalized);
+        }
+      } catch (err) {
+        // ignore malformed links
+      }
+    }
+
+    if (
+      href &&
+      !href.startsWith("#") &&
+      !href.startsWith("mailto:") &&
+      !href.startsWith("tel:") &&
+      !href.toLowerCase().startsWith("javascript:")
+    ) {
+      try {
+        const absolute = new URL(href, pageUrl).toString();
+        if (!seenLinks.has(absolute)) {
+          seenLinks.add(absolute);
+          links.push(absolute);
         }
       } catch (err) {
         // ignore malformed links
@@ -173,7 +195,8 @@ function extractPageData(html, pageUrl) {
     hasSchema,
     wordCount,
     internalLinksCount: internalLinks.length,
-    internalLinks
+    internalLinks,
+    links
   };
 }
 
