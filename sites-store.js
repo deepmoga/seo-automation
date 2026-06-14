@@ -74,6 +74,8 @@ function addSite(data) {
     wpUsername: (data.wpUsername || "").trim(),
     wpAppPassword: (data.wpAppPassword || "").trim(),
     maxPages: Number(data.maxPages) > 0 ? Number(data.maxPages) : config.MAX_PAGES,
+    schedule: ["off", "daily", "weekly"].includes(data.schedule) ? data.schedule : "off",
+    scheduleAutoFix: !!data.scheduleAutoFix,
     createdAt: new Date().toISOString()
   };
 
@@ -109,7 +111,9 @@ function updateSite(id, data) {
       : existing.wpAppPassword,
     maxPages: data.maxPages !== undefined && Number(data.maxPages) > 0
       ? Number(data.maxPages)
-      : existing.maxPages
+      : existing.maxPages,
+    schedule: ["off", "daily", "weekly"].includes(data.schedule) ? data.schedule : existing.schedule || "off",
+    scheduleAutoFix: data.scheduleAutoFix !== undefined ? !!data.scheduleAutoFix : !!existing.scheduleAutoFix
   };
 
   sites[index] = updated;

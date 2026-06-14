@@ -54,6 +54,21 @@
           <label for="maxPages">Max Pages to Crawl</label>
           <input type="number" id="maxPages" name="maxPages" min="1" max="2000" value="200" />
         </div>
+        <div class="field">
+          <label for="schedule">Automatic Audit Schedule</label>
+          <select id="schedule" name="schedule">
+            <option value="off">Off (manual only)</option>
+            <option value="daily">Daily (2:00 AM)</option>
+            <option value="weekly">Weekly (Monday 2:00 AM)</option>
+          </select>
+          <p class="help">Runs automatically in the background and records score history.</p>
+        </div>
+        <div class="field">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+            <input type="checkbox" id="scheduleAutoFix" name="scheduleAutoFix" style="width:auto;" />
+            Also run AI auto-fix automatically (applies changes to WordPress without confirmation)
+          </label>
+        </div>
         <button type="submit" id="submitBtn">Add Site</button>
         <button type="button" id="cancelBtn" class="btn-secondary" style="display:none;">Cancel</button>
       </form>
@@ -86,7 +101,8 @@
           <div class="meta">
             <a href="${s.siteUrl}" target="_blank">${s.siteUrl}</a><br/>
             API: ${s.wpApiUrl}<br/>
-            WP user: ${s.wpUsername || '(not set)'} | App password: ${s.wpAppPasswordSet ? '✅ set' : '⚠️ not set'} | Max pages: ${s.maxPages}
+            WP user: ${s.wpUsername || '(not set)'} | App password: ${s.wpAppPasswordSet ? '✅ set' : '⚠️ not set'} | Max pages: ${s.maxPages}<br/>
+            Schedule: ${s.schedule === 'off' ? 'Off' : (s.schedule === 'daily' ? 'Daily (2:00 AM)' : 'Weekly (Mon 2:00 AM)')}${s.schedule !== 'off' && s.scheduleAutoFix ? ' + AI auto-fix' : ''}
           </div>
           <div class="row">
             <button class="btn-secondary btn-small" onclick='editSite(${JSON.stringify(s).replace(/'/g, "&#39;")})'>✏️ Edit</button>
@@ -104,6 +120,8 @@
       document.getElementById('wpUsername').value = site.wpUsername || '';
       document.getElementById('wpAppPassword').value = '';
       document.getElementById('maxPages').value = site.maxPages;
+      document.getElementById('schedule').value = site.schedule || 'off';
+      document.getElementById('scheduleAutoFix').checked = !!site.scheduleAutoFix;
 
       formTitle.textContent = `✏️ Edit Site: ${site.name}`;
       submitBtn.textContent = 'Save Changes';
@@ -115,6 +133,8 @@
       siteIdField.value = '';
       form.reset();
       document.getElementById('maxPages').value = 200;
+      document.getElementById('schedule').value = 'off';
+      document.getElementById('scheduleAutoFix').checked = false;
       formTitle.textContent = '➕ Add a Site';
       submitBtn.textContent = 'Add Site';
       cancelBtn.style.display = 'none';
@@ -135,7 +155,9 @@
         wpApiUrl: document.getElementById('wpApiUrl').value,
         wpUsername: document.getElementById('wpUsername').value,
         wpAppPassword: document.getElementById('wpAppPassword').value,
-        maxPages: document.getElementById('maxPages').value
+        maxPages: document.getElementById('maxPages').value,
+        schedule: document.getElementById('schedule').value,
+        scheduleAutoFix: document.getElementById('scheduleAutoFix').checked
       };
 
       const id = siteIdField.value;

@@ -10,9 +10,11 @@ const express = require("express");
 const session = require("express-session");
 const crypto = require("crypto");
 const config = require("./config");
-const runner = require("./runner");
 const reporter = require("./reporter");
 const sitesStore = require("./sites-store");
+const historyStore = require("./history-store");
+const jobs = require("./jobs");
+const scheduler = require("./scheduler");
 const { readEnv, writeEnv, maskValue } = require("./env-store");
 const fs = require("fs");
 const path = require("path");
@@ -136,81 +138,6 @@ app.use((req, res, next) => {
 });
 
 // ---------------------------------------------------------------------
-// In-memory job state (single job at a time, across all sites)
-// ---------------------------------------------------------------------
-const job = {
-  status: "idle", // idle | running | done | error
-  mode: null, // "audit" | "audit-fix" | "suggestions" | "meta-suggestions"
-  siteId: null,
-  logs: [],
-  startedAt: null,
-  finishedAt: null,
-  error: null
-};
-
-const MAX_LOG_LINES = 500;
-
-function pushLog(...args) {
-  const line = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
-  job.logs.push(line);
-  if (job.logs.length > MAX_LOG_LINES) job.logs.shift();
-}
-
-/**
- * Run a job in the background, capturing console.log output into
- * job.logs so the dashboard can show progress.
- */
-async function runJob(mode, site) {
-  if (job.status === "running") return;
-
-  job.status = "running";
-  job.mode = mode;
-  job.siteId = site.id;
-  job.logs = [];
-  job.startedAt = new Date().toISOString();
-  job.finishedAt = null;
-  job.error = null;
-
-  const originalLog = console.log;
-  console.log = (...args) => {
-    pushLog(...args);
-    originalLog(...args);
-  };
-
-  try {
-    if (mode === "audit") {
-      await runner.runAudit(site);
-    } else if (mode === "audit-fix") {
-      const analyzedPages = await runner.runAudit(site);
-      await runner.runAutoFix(analyzedPages, site);
-    } else if (mode === "suggestions") {
-      const existing = reporter.loadReport(site.id);
-      if (!existing || !existing.pages) {
-        throw new Error("No audit report found. Run an audit first.");
-      }
-      await runner.runSuggestions(existing.pages, site);
-    } else if (mode === "meta-suggestions") {
-      const existing = reporter.loadReport(site.id);
-      if (!existing || !existing.pages) {
-        throw new Error("No audit report found. Run an audit first.");
-      }
-      await runner.runMetaSuggestions(existing.pages, site);
-    } else {
-      throw new Error(`Unknown job mode: ${mode}`);
-    }
-
-    job.status = "done";
-  } catch (err) {
-    job.status = "error";
-    job.error = err.message;
-    pushLog(`❌ ${err.message}`);
-  } finally {
-    console.log = originalLog;
-    job.finishedAt = new Date().toISOString();
-  }
-}
-
-// ---------------------------------------------------------------------
 // Sites API
 // ---------------------------------------------------------------------
 function publicSite(site) {
@@ -221,7 +148,9 @@ function publicSite(site) {
     wpApiUrl: site.wpApiUrl,
     wpUsername: site.wpUsername,
     wpAppPasswordSet: !!site.wpAppPassword,
-    maxPages: site.maxPages
+    maxPages: site.maxPages,
+    schedule: site.schedule || "off",
+    scheduleAutoFix: !!site.scheduleAutoFix
   };
 }
 
@@ -234,18 +163,21 @@ app.post("/api/sites", (req, res) => {
     return res.status(400).json({ error: "siteUrl is required" });
   }
   const site = sitesStore.addSite(req.body);
+  scheduler.reload();
   res.json({ ok: true, site: publicSite(site) });
 });
 
 app.put("/api/sites/:id", (req, res) => {
   const site = sitesStore.updateSite(req.params.id, req.body);
   if (!site) return res.status(404).json({ error: "Site not found" });
+  scheduler.reload();
   res.json({ ok: true, site: publicSite(site) });
 });
 
 app.delete("/api/sites/:id", (req, res) => {
   const ok = sitesStore.deleteSite(req.params.id);
   if (!ok) return res.status(404).json({ error: "Site not found" });
+  scheduler.reload();
   res.json({ ok: true });
 });
 
@@ -255,6 +187,7 @@ app.delete("/api/sites/:id", (req, res) => {
 
 // Current job status + recent logs
 app.get("/api/status", (req, res) => {
+  const job = jobs.job;
   res.json({
     status: job.status,
     mode: job.mode,
@@ -277,6 +210,14 @@ app.get("/api/report", (req, res) => {
   res.json({ exists: true, ...data });
 });
 
+// Score history for a site (for trend display)
+app.get("/api/history", (req, res) => {
+  const siteId = req.query.siteId;
+  if (!siteId) return res.status(400).json({ error: "siteId is required" });
+
+  res.json({ history: historyStore.getHistory(siteId) });
+});
+
 // Start a new job for a site
 app.post("/api/run", (req, res) => {
   const mode = ["audit", "audit-fix", "suggestions", "meta-suggestions"].includes(req.body.mode)
@@ -286,11 +227,11 @@ app.post("/api/run", (req, res) => {
   const site = sitesStore.getSite(req.body.siteId);
   if (!site) return res.status(404).json({ error: "Site not found" });
 
-  if (job.status === "running") {
+  if (jobs.job.status === "running") {
     return res.status(409).json({ error: "A job is already running." });
   }
 
-  runJob(mode, site);
+  jobs.runJob(mode, site);
   res.json({ ok: true, mode, siteId: site.id });
 });
 
@@ -403,3 +344,5 @@ app.listen(config.PORT, () => {
   console.log("🚀 SEO Automation dashboard running!");
   console.log(`🌐 Open: http://localhost:${config.PORT}`);
 });
+
+scheduler.reload();

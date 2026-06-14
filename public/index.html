@@ -54,6 +54,11 @@
       <tbody id="reportBody"></tbody>
     </table>
 
+    <div class="section" id="historySection" style="display:none;">
+      <h2>📈 Score History</h2>
+      <div id="historyList"></div>
+    </div>
+
     <div class="section" id="suggestionsSection" style="display:none;">
       <h2>💡 SEO Improvement Suggestions</h2>
       <div id="suggestionsList"></div>
@@ -91,6 +96,8 @@
     const summaryEl = document.getElementById('summary');
     const reportTable = document.getElementById('reportTable');
     const reportBody = document.getElementById('reportBody');
+    const historySection = document.getElementById('historySection');
+    const historyList = document.getElementById('historyList');
     const suggestionsSection = document.getElementById('suggestionsSection');
     const suggestionsList = document.getElementById('suggestionsList');
     const keywordsSection = document.getElementById('keywordsSection');
@@ -126,12 +133,14 @@
 
       await loadConfig();
       await loadReport();
+      await loadHistory();
     }
 
     siteSelect.addEventListener('change', async () => {
       localStorage.setItem('selectedSiteId', currentSiteId());
       await loadConfig();
       await loadReport();
+      await loadHistory();
     });
 
     async function loadConfig() {
@@ -145,6 +154,50 @@
       if (score >= 80) return 'good';
       if (score >= 50) return 'mid';
       return 'bad';
+    }
+
+    function renderHistory(history) {
+      if (!history || history.length === 0) {
+        historySection.style.display = 'none';
+        return;
+      }
+
+      historySection.style.display = 'block';
+
+      const rows = [...history].reverse().slice(0, 15);
+
+      historyList.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Avg Score</th>
+              <th>Pages</th>
+              <th>🔴 Critical</th>
+              <th>🟡 Warning</th>
+              <th>🔵 Info</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((h) => `
+              <tr>
+                <td>${new Date(h.date).toLocaleString()}</td>
+                <td class="score ${scoreClass(h.avgScore)}">${h.avgScore}/100</td>
+                <td>${h.totalPages}</td>
+                <td>${h.critical || 0}</td>
+                <td>${h.warning || 0}</td>
+                <td>${h.info || 0}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function loadHistory() {
+      const res = await fetch(`/api/history?siteId=${currentSiteId()}`);
+      const data = await res.json();
+      renderHistory(data.history);
     }
 
     function renderSuggestions(suggestions) {
@@ -284,6 +337,7 @@
           polling = null;
         }
         loadReport();
+        loadHistory();
       }
     }
 
