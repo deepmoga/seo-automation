@@ -38,9 +38,39 @@ function getApiClient(creds = {}) {
   });
 }
 
+// Cache of REST-enabled post type bases per WP API base URL, so we only
+// hit /types once per site instead of once per page.
+const restTypesCache = new Map();
+
+/**
+ * Fetch the list of REST API bases to search for a post by slug:
+ * "posts" and "pages" first, then any other REST-enabled post types
+ * (e.g. custom post types like "service", "portfolio", "product").
+ */
+async function getSearchableTypes(api, baseURL) {
+  if (restTypesCache.has(baseURL)) return restTypesCache.get(baseURL);
+
+  let types = ["posts", "pages"];
+
+  try {
+    const { data } = await api.get("/types");
+    const customBases = Object.values(data)
+      .map((t) => t.rest_base)
+      .filter((base) => base && !types.includes(base));
+
+    types = [...types, ...customBases];
+  } catch (err) {
+    // Fall back to the default posts/pages if /types isn't available
+  }
+
+  restTypesCache.set(baseURL, types);
+  return types;
+}
+
 /**
  * Try to find a WordPress post or page by its front-end URL.
- * Searches both /posts and /pages endpoints by slug.
+ * Searches /posts and /pages first, then any other REST-enabled custom
+ * post types (e.g. "service", "product", "portfolio") by slug.
  * Returns { id, type } or null if not found.
  */
 async function findPostByUrl(pageUrl, creds = {}) {
@@ -56,8 +86,9 @@ async function findPostByUrl(pageUrl, creds = {}) {
       return null; // homepage usually maps to a special "front page" setting
     }
 
-    // Try posts first, then pages
-    for (const type of ["posts", "pages"]) {
+    const types = await getSearchableTypes(api, api.defaults.baseURL);
+
+    for (const type of types) {
       try {
         const { data } = await api.get(`/${type}`, {
           params: { slug, status: "any" }
