@@ -534,6 +534,7 @@
               <th>Meta Description</th>
               <th>Schema</th>
               <th>Alt Texts Fixed</th>
+              <th>Saved to WordPress</th>
             </tr>
           </thead>
           <tbody>
@@ -547,6 +548,11 @@
                 <td>${f.metaDescription ? `<div style="color:#4ade80;">${f.metaDescription}</div>` : '-'}</td>
                 <td>${f.schema ? '✅' : '-'}</td>
                 <td>${f.altTextsFixed || 0}</td>
+                <td>${f.saved === true
+                  ? '<span class="score good">✅ Saved</span>'
+                  : f.saved === false
+                    ? `<span class="score bad">❌ ${f.saveError || 'Failed'}</span>`
+                    : '-'}</td>
               </tr>
             `).join('')}
           </tbody>

@@ -7,6 +7,20 @@ const axios = require("axios");
 const config = require("./config");
 
 /**
+ * Build a human-readable error message from an axios error, including
+ * the WordPress REST API's own error message/code when available
+ * (e.g. "401 rest_cannot_edit: Sorry, you are not allowed to edit this post.").
+ */
+function describeError(err) {
+  const res = err.response;
+  if (res) {
+    const wpMessage = res.data && (res.data.message || res.data.code);
+    return `${res.status}${wpMessage ? ` ${wpMessage}` : ""}`;
+  }
+  return err.message;
+}
+
+/**
  * Build the Basic Auth header from the given WP credentials, falling
  * back to global config (single-site/.env mode) if not provided.
  */
@@ -177,13 +191,15 @@ async function updatePostSEO(postId, fixes = {}, creds = {}) {
 
     // Inject schema markup if provided
     if (schema) {
-      await injectSchema(postId, schema, postType, creds);
+      const schemaResult = await injectSchema(postId, schema, postType, creds);
+      if (!schemaResult.success) return schemaResult;
     }
 
-    return true;
+    return { success: true, error: null };
   } catch (err) {
-    console.log(`⚠️  updatePostSEO failed for ${postType} #${postId}: ${err.message}`);
-    return false;
+    const error = describeError(err);
+    console.log(`⚠️  updatePostSEO failed for ${postType} #${postId}: ${error}`);
+    return { success: false, error };
   }
 }
 
@@ -203,7 +219,7 @@ async function updateImageAlt(mediaId, altText, creds = {}) {
     console.log(`   🖼️  Updated alt text for media #${mediaId}: "${altText}"`);
     return true;
   } catch (err) {
-    console.log(`⚠️  updateImageAlt failed for media #${mediaId}: ${err.message}`);
+    console.log(`⚠️  updateImageAlt failed for media #${mediaId}: ${describeError(err)}`);
     return false;
   }
 }
@@ -218,7 +234,7 @@ async function updateImageAlt(mediaId, altText, creds = {}) {
  * @param {string} postType - "posts" or "pages"
  */
 async function injectSchema(postId, schemaJson, postType = "posts", creds = {}) {
-  if (!schemaJson) return false;
+  if (!schemaJson) return { success: false, error: null };
 
   try {
     const api = getApiClient(creds);
@@ -250,10 +266,11 @@ async function injectSchema(postId, schemaJson, postType = "posts", creds = {}) 
     await api.post(`/${postType}/${postId}`, { content: newContent });
 
     console.log(`   🧩  Injected schema markup into ${postType} #${postId}`);
-    return true;
+    return { success: true, error: null };
   } catch (err) {
-    console.log(`⚠️  injectSchema failed for ${postType} #${postId}: ${err.message}`);
-    return false;
+    const error = describeError(err);
+    console.log(`⚠️  injectSchema failed for ${postType} #${postId}: ${error}`);
+    return { success: false, error };
   }
 }
 

@@ -92,7 +92,9 @@ async function fixPage(page, site = null) {
     title: null,
     metaDescription: null,
     schema: null,
-    altTextsFixed: 0
+    altTextsFixed: 0,
+    saved: null,
+    saveError: null
   };
 
   try {
@@ -144,7 +146,7 @@ async function fixPage(page, site = null) {
 
     // Apply title / meta description / schema together
     if (newTitle || newMetaDescription || newSchema) {
-      await fixer.updatePostSEO(wpPost.id, {
+      const saveResult = await fixer.updatePostSEO(wpPost.id, {
         title: newTitle || undefined,
         metaDescription: newMetaDescription || undefined,
         schema: newSchema || undefined,
@@ -154,6 +156,8 @@ async function fixPage(page, site = null) {
       fixesApplied.title = newTitle || null;
       fixesApplied.metaDescription = newMetaDescription || null;
       fixesApplied.schema = newSchema || null;
+      fixesApplied.saved = saveResult.success;
+      fixesApplied.saveError = saveResult.error;
 
       await delay(config.API_DELAY_MS);
     }
